@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN" class="dark">
 <head>
   <meta charset="UTF-8">
@@ -445,6 +445,51 @@
                       <div class="text-[10px]" :class="isDarkMode ? 'text-slate-500' : 'text-slate-500'">请求体始终传 stream 字段，默认 true</div>
                     </div>
                     <input type="checkbox" v-model="streamEnabled" class="rounded text-cyan-600 focus:ring-cyan-500 h-4 w-4">
+                  </div>
+                </div>
+
+                <!-- Max Tokens (max_tokens) -->
+                <div class="pt-2 border-t" :class="isDarkMode ? 'border-slate-800' : 'border-slate-200'">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="min-w-0">
+                      <div class="font-medium truncate" :class="isDarkMode ? 'text-slate-200' : 'text-slate-800'">Max Tokens (最大长度)</div>
+                      <div class="text-[10px]" :class="isDarkMode ? 'text-slate-500' : 'text-slate-500'">设为 0 时不传该参数；默认 65536 (64K)</div>
+                    </div>
+                    <div class="flex items-center space-x-1 flex-shrink-0">
+                      <input v-model.number="maxTokens" type="number" min="0" step="1024"
+                             @blur="onMaxTokensBlur"
+                             placeholder="65536"
+                             class="w-24 px-2 py-1 text-xs rounded border text-right font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                             :class="isDarkMode ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-300 text-slate-800'">
+                    </div>
+                  </div>
+                  <!-- Quick Preset Tags -->
+                  <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                    <button type="button" @click="maxTokens = 0"
+                            class="text-[10px] px-1.5 py-0.5 rounded border transition font-mono"
+                            :class="maxTokens === 0 ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/40 font-semibold' : (isDarkMode ? 'bg-slate-950/60 text-slate-400 hover:text-slate-200 border-slate-800' : 'bg-white text-slate-600 hover:text-slate-800 border-slate-200')">
+                      0 (不传)
+                    </button>
+                    <button type="button" @click="maxTokens = 4096"
+                            class="text-[10px] px-1.5 py-0.5 rounded border transition font-mono"
+                            :class="maxTokens === 4096 ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/40 font-semibold' : (isDarkMode ? 'bg-slate-950/60 text-slate-400 hover:text-slate-200 border-slate-800' : 'bg-white text-slate-600 hover:text-slate-800 border-slate-200')">
+                      4K
+                    </button>
+                    <button type="button" @click="maxTokens = 16384"
+                            class="text-[10px] px-1.5 py-0.5 rounded border transition font-mono"
+                            :class="maxTokens === 16384 ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/40 font-semibold' : (isDarkMode ? 'bg-slate-950/60 text-slate-400 hover:text-slate-200 border-slate-800' : 'bg-white text-slate-600 hover:text-slate-800 border-slate-200')">
+                      16K
+                    </button>
+                    <button type="button" @click="maxTokens = 65536"
+                            class="text-[10px] px-1.5 py-0.5 rounded border transition font-mono"
+                            :class="maxTokens === 65536 ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/40 font-semibold' : (isDarkMode ? 'bg-slate-950/60 text-slate-400 hover:text-slate-200 border-slate-800' : 'bg-white text-slate-600 hover:text-slate-800 border-slate-200')">
+                      64K (默认)
+                    </button>
+                    <button type="button" @click="maxTokens = 131072"
+                            class="text-[10px] px-1.5 py-0.5 rounded border transition font-mono"
+                            :class="maxTokens === 131072 ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/40 font-semibold' : (isDarkMode ? 'bg-slate-950/60 text-slate-400 hover:text-slate-200 border-slate-800' : 'bg-white text-slate-600 hover:text-slate-800 border-slate-200')">
+                      128K
+                    </button>
                   </div>
                 </div>
 
@@ -2515,13 +2560,13 @@
           <div class="p-3.5 rounded-xl border"
                :class="isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'">
             <h4 class="font-bold text-amber-400 mb-1">4. 鹈鹕骑单车 (Pelican on a Bicycle) 动画基准测试</h4>
-            <p>基于开源大模型社区广泛采用的经典测试题：<code>生成一个svg动画：鹈鹕骑自行车，用H5给我展示下</code>。全方位检验模型对于复杂几何空间构图、SVG 矢量元素布局（大嘴咽囊、自行车轮、齿轮踏板）以及 CSS/SVG 关键帧动画的综合代码生成能力，并集成纯前端沙箱实时渲染。该维度<strong>不限制 max_tokens</strong>，避免代码被截断导致误判为“未生成有效动画”。</p>
+            <p>基于开源大模型社区广泛采用的经典测试题：<code>生成一个svg动画：鹈鹕骑自行车，用H5给我展示下</code>。全方位检验模型对于复杂几何空间构图、SVG 矢量元素布局（大嘴咽囊、自行车轮、齿轮踏板）以及 CSS/SVG 关键帧动画的综合代码生成能力，并集成纯前端沙箱实时渲染。支持生成大体量动画代码，配合全局 <code>max_tokens</code>（默认 65536，设为 0 时不限制），避免代码被截断导致误判为“未生成有效动画”。</p>
           </div>
 
           <div class="p-3.5 rounded-xl border"
                :class="isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'">
             <h4 class="font-bold text-cyan-500 mb-1">5. 请求参数与流式返回</h4>
-            <p>所有检测请求只发送核心参数（<code>model</code>、<code>messages</code>，按维度补充 <code>stream</code>（可选）、 <code>tools</code>、<code>reasoning_effort</code> 或 <code>max_tokens</code>），不发送 <code>temperature</code>、<code>top_p</code> 等采样参数，避免中转站改写或丢弃参数造成干扰。开启流式后接口返回 SSE 时按 <code>data:</code> 增量还原完整内容后再判定；若中转站忽略 <code>stream</code> 直接返回 JSON，也能正常解析。</p>
+            <p>所有检测请求默认携带 <code>max_tokens=65536</code>（64K，可在左侧配置 0-n，设为 0 时不传该参数），只发送核心参数（<code>model</code>、<code>messages</code>，按维度补充 <code>stream</code>、<code>tools</code>、<code>reasoning_effort</code>），不发送 <code>temperature</code>、<code>top_p</code> 等采样参数，避免中转站改写或丢弃参数造成干扰。开启流式后接口返回 SSE 时按 <code>data:</code> 增量还原完整内容后再判定；若中转站忽略 <code>stream</code> 直接返回 JSON，也能正常解析。</p>
           </div>
 
           <div class="p-3.5 rounded-xl border"
@@ -2599,9 +2644,32 @@
         const thinkingEffort = ref('high');
         // 流式开关：请求体始终显式携带 stream 字段（默认 true），开启后按 SSE 增量还原
         const streamEnabled = ref(true);
+        // 最大 Token 数：所有请求默认 65536 (64K)，可在页面设置 0-n，设为 0 时不传该参数
+        const maxTokens = ref(65536);
         // 并发请求数：默认 1（串行）；>1 时多个请求同时进行
         const concurrency = ref(1);
         const timeoutSeconds = ref(60); // 默认 60 秒
+
+        const onMaxTokensBlur = () => {
+          if (maxTokens.value === '' || maxTokens.value === null || isNaN(maxTokens.value)) {
+            maxTokens.value = 65536;
+          } else if (maxTokens.value < 0) {
+            maxTokens.value = 0;
+          } else {
+            maxTokens.value = Math.floor(maxTokens.value);
+          }
+        };
+
+        const applyMaxTokens = (payload) => {
+          if (!payload) return payload;
+          const val = Number(maxTokens.value);
+          if (!isNaN(val) && val > 0) {
+            payload.max_tokens = Math.floor(val);
+          } else {
+            delete payload.max_tokens;
+          }
+          return payload;
+        };
 
         // Pelican Sandbox Modal State
         const showPelicanModal = ref(false);
@@ -3760,6 +3828,7 @@
 
         // 统一请求执行器：只记录接口真实返回，超时/网络失败如实标记，不伪造报文
         const performRequest = async (ctx, payload, timeoutMs) => {
+          applyMaxTokens(payload);
           const startedAt = performance.now();
           const controller = new AbortController();
           let timedOut = false;
@@ -3813,9 +3882,9 @@
         const runChatTask = async (modelId, result, ctx, run) => {
           const chatPayload = {
             model: modelId,
-            messages: [{ role: 'user', content: 'Say "PONG" and nothing else.' }],
-            max_tokens: 30
+            messages: [{ role: 'user', content: 'Say "PONG" and nothing else.' }]
           };
+          applyMaxTokens(chatPayload);
           chatPayload.stream = streamEnabled.value;
 
           const r = await performRequest(ctx, chatPayload, timeoutSeconds.value * 1000);
@@ -3871,9 +3940,9 @@
         const runThinkingTask = async (modelId, result, ctx, run) => {
           const thinkingPayload = {
             model: modelId,
-            messages: [{ role: 'user', content: thinkingPrompt.value }],
-            max_tokens: 1500
+            messages: [{ role: 'user', content: thinkingPrompt.value }]
           };
+          applyMaxTokens(thinkingPayload);
           thinkingPayload.stream = streamEnabled.value;
           // 显式传入思考参数，默认 high；选“不传”时保持原始请求体
           if (thinkingEffort.value && thinkingEffort.value !== 'none') {
@@ -3962,9 +4031,9 @@
                   }
                 ]
               }
-            ],
-            max_tokens: 50
+            ]
           };
+          applyMaxTokens(visionPayload);
           visionPayload.stream = streamEnabled.value;
 
           const r = await performRequest(ctx, visionPayload, timeoutSeconds.value * 1000);
@@ -4064,9 +4133,9 @@
                 }
               }
             ],
-            tool_choice: 'auto',
-            max_tokens: 150
+            tool_choice: 'auto'
           };
+          applyMaxTokens(toolsPayload);
           toolsPayload.stream = streamEnabled.value;
 
           const r = await performRequest(ctx, toolsPayload, timeoutSeconds.value * 1000);
@@ -4150,11 +4219,12 @@
         };
 
         const runPelicanTask = async (modelId, result, ctx, run) => {
-          // 鹈鹕测试不限制 max_tokens：SVG/H5 代码量较大，人为截断会导致误判为“未生成有效动画”
+          // 鹈鹕测试应用全局 max_tokens（默认 65536，设为 0 时不传）
           const pelicanPayload = {
             model: modelId,
             messages: [{ role: 'user', content: pelicanPrompt.value }]
           };
+          applyMaxTokens(pelicanPayload);
           pelicanPayload.stream = streamEnabled.value;
 
           // 鹈鹕需要生成大量 SVG/HTML，按用户阈值的 1.5 倍执行（报文面板会标注实际使用值）
@@ -4489,7 +4559,7 @@
                   endpoint: dummyEndpoint,
                   method: 'POST',
                   headers: dummyHeaders,
-                  requestBody: { model: 'gpt-4o', messages: [{ role: 'user', content: 'Say "PONG" and nothing else.' }], max_tokens: 30, stream: false },
+                  requestBody: { model: 'gpt-4o', messages: [{ role: 'user', content: 'Say "PONG" and nothing else.' }], max_tokens: 65536, stream: false },
                   status: 200,
                   statusText: 'OK',
                   latency: 260,
@@ -4504,7 +4574,7 @@
                   endpoint: dummyEndpoint,
                   method: 'POST',
                   headers: dummyHeaders,
-                  requestBody: { model: 'gpt-4o', messages: [{ role: 'user', content: thinkingPrompt.value }], max_tokens: 1500, reasoning_effort: 'high', stream: false },
+                  requestBody: { model: 'gpt-4o', messages: [{ role: 'user', content: thinkingPrompt.value }], max_tokens: 65536, reasoning_effort: 'high', stream: false },
                   status: 200,
                   statusText: 'OK',
                   latency: 320,
@@ -4696,6 +4766,7 @@
         watch(corsProxyUrl, (v) => localStorage.setItem('model_inspector_cors_proxy_url', v));
         watch(thinkingEffort, (v) => localStorage.setItem('model_inspector_thinking_effort', v));
         watch(streamEnabled, (v) => localStorage.setItem('model_inspector_stream_enabled', v ? '1' : '0'));
+        watch(maxTokens, (v) => localStorage.setItem('model_inspector_max_tokens', String(v ?? '')));
         watch(concurrency, (v) => localStorage.setItem('model_inspector_concurrency', String(v)));
         watch(timeoutSeconds, (v) => localStorage.setItem('model_inspector_timeout_seconds', String(v)));
         watch(showAdvanced, (v) => localStorage.setItem('model_inspector_show_advanced', v ? '1' : '0'));
@@ -4759,6 +4830,22 @@
             thinkingEffort.value = sEffort;
           } else {
             thinkingEffort.value = 'high';
+          }
+
+          const sMaxTokens = localStorage.getItem('model_inspector_max_tokens');
+          if (sMaxTokens !== null && sMaxTokens !== '') {
+            const num = parseInt(sMaxTokens, 10);
+            if (num === 64000) {
+              // 自动升级旧版本的 64000 为精确的 64K (65536)
+              maxTokens.value = 65536;
+              localStorage.setItem('model_inspector_max_tokens', '65536');
+            } else if (!isNaN(num) && num >= 0) {
+              maxTokens.value = num;
+            } else {
+              maxTokens.value = 65536;
+            }
+          } else {
+            maxTokens.value = 65536;
           }
 
           // 流式开关：默认开启 stream=true（历史版本默认 false 自动迁移为 true）
@@ -4836,6 +4923,8 @@
           thinkingPrompt,
           thinkingEffort,
           streamEnabled,
+          maxTokens,
+          onMaxTokensBlur,
           showPelicanModal,
           activePelicanModel,
           pelicanModalTab,

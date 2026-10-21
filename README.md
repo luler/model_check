@@ -69,8 +69,8 @@ model_check/
 
 - **动态拉取模型**：`GET {BaseURL}/models`，自动解析 `data[].id` 或数组格式。
 - **思考输出 (Thinking)**：向 `/chat/completions` 发送高难度推理问题，携带 `reasoning_effort`（默认 high），严格提取 `reasoning_content` 及 `<think>` 标签，统计思考过程长度。
-- **鹈鹕单车 (Pelican)**：请求不设置 `max_tokens`，避免长 SVG/H5 代码被截断导致误判。
-- **请求参数**：只发送核心参数（`model`、`messages`，按维度补充 `stream`/`tools`/`reasoning_effort`/`max_tokens`），不发送 `temperature`、`top_p` 等采样参数。
+- **全局 Token 长度与鹈鹕单车**：所有请求默认设置 `max_tokens=65536`（64K，可在左栏设置 0-n，设为 0 时不传），避免思考链或长 SVG/H5 代码被截断导致误判。
+- **请求参数**：默认携带 `max_tokens=65536`（64K），只发送核心参数（`model`、`messages`，按维度补充 `stream`/`tools`/`reasoning_effort`），不发送 `temperature`、`top_p` 等采样参数。
 - **流式兼容**：返回 SSE 时按 `data:` 增量合并后再判定；中转站忽略 `stream` 返回 JSON 时同样可解析。
 - **并发调度**：任务按「模型 × 检测维度」拆入任务池，并发数默认 1（串行），可调大；设为 5 时单模型的 5 个维度会同时发起，多模型时最多同时进行 5 个请求。
 - **视觉能力 (Vision)**：向 `/chat/completions` 发送动态 Canvas 绘制的 64x64 高对比纯红底色与中心蓝圆图样，排查过滤 20 余种“无法查看图片”的中转拒答假阳性，模型必须识别出色块真值方可判定支持。
