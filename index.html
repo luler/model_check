@@ -1477,6 +1477,11 @@
                   📋 复制思考过程
                 </button>
               </div>
+              <div v-else-if="activeInspectorResult.thinking?.supported && activeInspectorResult.thinking?.reasoningTokens" class="flex items-center space-x-2">
+                <span class="text-[10px] font-mono px-2 py-1 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  ⚡ 消耗思考: {{ activeInspectorResult.thinking.reasoningTokens }} Tokens
+                </span>
+              </div>
             </div>
 
             <!-- Thinking Content Display Box -->
@@ -1493,6 +1498,17 @@
                    :class="isDarkMode ? 'bg-slate-950 border-purple-900/40 text-purple-200/90' : 'bg-white border-purple-200 text-purple-950'">
                 {{ activeInspectorResult.thinking.reasoning }}
               </div>
+            </div>
+            <!-- If thinking supported via reasoningTokens without text (e.g. OpenAI o1/o3-mini) -->
+            <div v-else-if="activeInspectorResult.thinking?.supported && activeInspectorResult.thinking?.reasoningTokens" class="p-3.5 rounded-xl border space-y-1 transition-colors"
+                 :class="isDarkMode ? 'bg-purple-950/20 border-purple-900/40 text-purple-300' : 'bg-purple-50 border-purple-200 text-purple-900'">
+              <div class="text-xs font-bold flex items-center space-x-1.5">
+                <span>⚡</span>
+                <span>原生隐式深度思考 (Implicit Reasoning):</span>
+              </div>
+              <p class="text-xs opacity-90 leading-relaxed font-mono">
+                模型/服务商已在后台完成深度思考并计费（消耗 {{ activeInspectorResult.thinking.reasoningTokens }} 个 reasoning_tokens），但未下发内部思维链明文（符合 OpenAI o1 / o3-mini 等隐式推理模型规范）。
+              </p>
             </div>
 
             <!-- Model Final Answer Box -->
@@ -2554,7 +2570,11 @@
             <h4 class="font-bold text-purple-400 mb-1">3. 深度思考输出 (Thinking / Reasoning) 检测</h4>
             <p>全兼容 OpenAI 接口与各大推理模型规范。请求始终显式携带 <code>stream</code> 字段（默认 <code>false</code>），可在左侧开启流式（<code>true</code>），开启后按 SSE 增量还原完整思考链；并显式携带 <code>reasoning_effort</code>（可在左侧选择 high / medium / low，默认 <strong>high</strong>）。自动解析 <code>reasoning_content</code>、<code>reasoning</code>、<code>thought</code> 以及正文内嵌的 <code>&lt;think&gt;...&lt;/think&gt;</code> 思考标签，严谨统计思考字数与耗时，剥离思考链让正文不受污染并以折叠卡片形式美观展示。</p>
             <p class="mt-1.5"><strong>通用防误判：</strong>各维度都会检查响应正文是否属于上层错误提示（欠费、限流、鉴权失败、模型不存在等）。这类 HTTP 200 的“伪成功”一律判为不支持，不会因为正文里恰好含有 <code>red</code>、<code>get_current_weather</code> 等关键词而误通过。</p>
-            <p class="mt-1.5"><strong>思考判定标准（严格）：</strong>上述字段为 <code>null</code>、空串或纯空白时一律视为“未返回思考文本”，不算支持；<code>usage</code> 报告了 <code>reasoning_tokens</code> 但思考文本为空，同样判为不支持（仅有计数无法验证思考链）。只有在没有独立思考字段、但正文确实包含明确分步推理结构（如 “Step 1 / 第一步 / 逐步分析” 且篇幅足够）时，才按“正文推理”计入支持。</p>
+            <p class="mt-1.5"><strong>思考判定标准（严格严谨）：</strong>
+              ① 若提取到独立的思考文本（<code>reasoning_content</code>、<code>thought</code>、<code>&lt;think&gt;</code> 或 Claude 原生 <code>thinking</code> 块），直接判定为支持；<br>
+              ② 若接口隐藏了思考明文但 <code>usage</code> 中明确报告了 <code>reasoning_tokens &gt; 0</code>（如 OpenAI o1 / o3-mini），判定为支持（标明消耗的思考 Token）；<br>
+              ③ <strong>严格防假阳性：</strong>若 <code>reasoning_tokens == 0</code> 或无独立思考字段，仅因提示词引导而在正文中按 1. 2. 格式输出分步内容者，一律严格判为<strong>不支持</strong>，杜绝普通模型误判为深度思考模型。
+            </p>
           </div>
 
           <div class="p-3.5 rounded-xl border"
@@ -2801,12 +2821,21 @@
             if (typeof delta.content === 'string') {
               content += delta.content;
             } else if (Array.isArray(delta.content)) {
-              content += delta.content.map(c => typeof c === 'string' ? c : (c?.text || '')).join('');
+              for (const c of delta.content) {
+                if (c && (c.type === 'thinking' || c.thinking || c.type === 'thought')) {
+                  reasoning += (c.thinking || c.thought || c.text || '');
+                } else if (typeof c === 'string') {
+                  content += c;
+                } else if (c?.text) {
+                  content += c.text;
+                }
+              }
             }
 
             if (typeof delta.reasoning_content === 'string') reasoning += delta.reasoning_content;
             else if (typeof delta.reasoning === 'string') reasoning += delta.reasoning;
             if (typeof delta.thought === 'string') reasoning += delta.thought;
+            if (typeof delta.thinking === 'string') reasoning += delta.thinking;
 
             if (Array.isArray(delta.tool_calls)) {
               for (const tc of delta.tool_calls) {
@@ -3564,32 +3593,66 @@
           if (Array.isArray(val)) {
             return val.map(v => {
               if (typeof v === 'string') return v;
-              if (v && typeof v === 'object') return v.text || v.content || '';
+              if (v && typeof v === 'object') return v.thinking || v.thought || v.text || v.content || '';
               return '';
             }).join('\n').trim();
           }
           if (typeof val === 'object') {
-            const t = val.text || val.content || val.thinking || '';
+            const t = val.thinking || val.thought || val.text || val.content || '';
             return typeof t === 'string' ? t.trim() : '';
           }
           return String(val).trim();
         };
 
+        // 从 usage 各种规范中安全提取原生思考 token 数（返回 number 或 null）
+        const extractReasoningTokens = (usage) => {
+          if (!usage || typeof usage !== 'object') return null;
+          // 1. OpenAI completion_tokens_details.reasoning_tokens
+          if (usage.completion_tokens_details && typeof usage.completion_tokens_details.reasoning_tokens === 'number') {
+            return usage.completion_tokens_details.reasoning_tokens;
+          }
+          // 2. output_tokens_details.reasoning_tokens
+          if (usage.output_tokens_details && typeof usage.output_tokens_details.reasoning_tokens === 'number') {
+            return usage.output_tokens_details.reasoning_tokens;
+          }
+          // 3. usage.reasoning_tokens
+          if (typeof usage.reasoning_tokens === 'number') {
+            return usage.reasoning_tokens;
+          }
+          // 4. Anthropic thinking_tokens / claude_usage
+          if (typeof usage.thinking_tokens === 'number') {
+            return usage.thinking_tokens;
+          }
+          if (usage.billing_usage?.claude_usage && typeof usage.billing_usage.claude_usage.thinking_tokens === 'number') {
+            return usage.billing_usage.claude_usage.thinking_tokens;
+          }
+          return null;
+        };
+
         const extractReasoningAndContent = (message) => {
           let reasoning = '';
           let content = message?.content || '';
-          if (typeof content !== 'string') {
-            if (Array.isArray(content)) {
-              content = content.map(c => c?.text || '').join('');
-            } else {
-              content = '';
+
+          if (Array.isArray(content)) {
+            const thinkBlocks = content.filter(c => c && (c.type === 'thinking' || c.thinking || c.type === 'thought'));
+            if (thinkBlocks.length > 0) {
+              reasoning = thinkBlocks.map(c => normalizeReasoningText(c.thinking || c.thought || c.text || '')).filter(Boolean).join('\n\n');
             }
+            content = content
+              .filter(c => !c || (c.type !== 'thinking' && c.type !== 'thought'))
+              .map(c => (typeof c === 'string' ? c : (c?.text || '')))
+              .join('');
+          } else if (typeof content !== 'string') {
+            content = '';
           }
 
           // 1. Explicit reasoning fields from provider responses（空值视为未提供，继续取下一个字段）
-          reasoning = normalizeReasoningText(message?.reasoning_content)
-            || normalizeReasoningText(message?.reasoning)
-            || normalizeReasoningText(message?.thought);
+          if (!reasoning) {
+            reasoning = normalizeReasoningText(message?.reasoning_content)
+              || normalizeReasoningText(message?.reasoning)
+              || normalizeReasoningText(message?.thought)
+              || normalizeReasoningText(message?.thinking);
+          }
 
           // 2. Embedded <think> tags in content
           const thinkMatch = content.match(/<think>([\s\S]*?)<\/think>/i);
@@ -3808,7 +3871,7 @@
           model: modelId,
           timestamp: new Date().toLocaleTimeString(),
           chat: { supported: false, latency: 0, replyText: '', reasoning: '', error: null, usage: null },
-          thinking: { supported: false, latency: 0, replyText: '', reasoning: '', wordCount: 0, error: null, usage: null },
+          thinking: { supported: false, latency: 0, replyText: '', reasoning: '', wordCount: 0, reasoningTokens: 0, error: null, usage: null },
           vision: { supported: false, latency: 0, replyText: '', reasoning: '', detail: '', error: null },
           tools: { supported: false, simulated: false, latency: 0, replyText: '', reasoning: '', detail: '', toolCalls: null, error: null },
           pelican: { supported: false, latency: 0, replyText: '', reasoning: '', htmlCode: '', detail: '', error: null },
@@ -3970,36 +4033,53 @@
 
               const reasoningText = normalizeReasoningText(parsed.reasoning);
               const hasReasoningText = reasoningText.length > 0;
-              const reasoningTokens = (data.usage?.completion_tokens_details?.reasoning_tokens || 0) > 0;
+              const reasoningTokenCount = extractReasoningTokens(data.usage);
+              const hasReasoningTokens = typeof reasoningTokenCount === 'number' && reasoningTokenCount > 0;
+              const explicitZeroReasoningTokens = typeof reasoningTokenCount === 'number' && reasoningTokenCount === 0;
+              result.thinking.reasoningTokens = typeof reasoningTokenCount === 'number' ? reasoningTokenCount : 0;
+
               const reply = (parsed.content || '').trim();
               const refusalMatch = findThinkingRefusal(reply);
+              const promptAsksForThinking = /思考过程|推理过程|分步|step by step|let me think/i.test(thinkingPrompt.value || '');
 
               if (hasReasoningText) {
-                // 唯一硬标准：确实拿到了非空的思考文本
+                // 1. 成功提取到非空的显式思考链文本（reasoning_content / <think> / Claude thinking 块等）
                 result.thinking.supported = true;
-                result.thinking.detail = `成功提取思考链 (${reasoningText.length} 字符思考过程)`;
+                result.thinking.detail = hasReasoningTokens
+                  ? `成功提取思考链 (${reasoningText.length} 字符，消耗 ${reasoningTokenCount} reasoning_tokens)`
+                  : `成功提取思考链 (${reasoningText.length} 字符思考过程)`;
+                run.status.thinking = 'ok';
+              } else if (hasReasoningTokens) {
+                // 2. 原生思考 Token 显著大于 0（如 OpenAI o1 / o3-mini 等隐式推理模型，接口隐藏思考明文但实际执行了深度思考并计费）
+                result.thinking.supported = true;
+                result.thinking.detail = `检测到原生深度思考 Token (消耗 ${reasoningTokenCount} reasoning_tokens，模型/服务商已隐藏思考过程明文)`;
                 run.status.thinking = 'ok';
               } else if (refusalMatch) {
-                // 模型明确拒答输出内部思考过程或思维链
+                // 3. 模型明确拒答输出内部思考过程或思维链
                 result.thinking.supported = false;
                 result.thinking.error = `模型明确拒答输出思维链（检测到拒答提示："${refusalMatch}"）`;
                 run.status.thinking = 'fail';
               } else if (looksLikeProviderError(reply)) {
+                // 4. 接口返回 200 但属于额度/限流等上游错误提示
                 result.thinking.supported = false;
                 result.thinking.error = `接口返回 200，但正文是上游错误提示（非模型回答）："${reply.slice(0, 120)}"`;
                 run.status.thinking = 'fail';
-              } else if (reasoningTokens) {
-                // 只报告了 reasoning_tokens，但思考文本为空 → 不算支持
+              } else if (explicitZeroReasoningTokens) {
+                // 5. usage 显式返回了 reasoning_tokens = 0 且无独立思考字段，绝对属于未开启或不支持思考
                 result.thinking.supported = false;
-                result.thinking.error = 'usage 报告了 reasoning_tokens，但 reasoning_content / reasoning / thought / <think> 均未返回任何思考文本，无法验证思考链';
+                result.thinking.error = '接口显式返回 reasoning_tokens = 0 且无独立思考字段，未触发原生深度思考' + (looksLikeStepByStep(reply) ? '（正文分步仅为响应提示词要求的普通格式输出，非原生思维链）' : '');
                 run.status.thinking = 'fail';
-              } else if (looksLikeStepByStep(reply)) {
+              } else if (!promptAsksForThinking && looksLikeStepByStep(reply)) {
+                // 6. 仅当 Prompt 本身未要求分步/思考时，模型自发输出的结构化推理解析，才作为正文推理的兜底计入
                 result.thinking.supported = true;
-                result.thinking.detail = '正文中包含明确的分步推理过程 (无独立思考字段)';
+                result.thinking.detail = '正文中包含自发分步推理过程 (无独立思考字段与 Token 统计)';
                 run.status.thinking = 'ok';
               } else {
+                // 7. 纯普通文本回答
                 result.thinking.supported = false;
-                result.thinking.error = '模型直接给出答案，未输出深度思考推理链';
+                result.thinking.error = promptAsksForThinking && looksLikeStepByStep(reply)
+                  ? '模型未输出原生深度思考（无独立思考字段，正文分步仅为提示词引导输出）'
+                  : '模型直接给出答案，未输出深度思考推理链';
                 run.status.thinking = 'fail';
               }
             } else {
