@@ -880,18 +880,18 @@
             <div class="mt-4 pt-3.5 border-t"
                  :class="isDarkMode ? 'border-slate-800' : 'border-slate-200'">
               <button @click="startSelectedModelsTest" 
-                      :disabled="isTesting || selectedModels.length === 0"
+                      :disabled="isBatchTesting || selectedModels.length === 0"
                       class="w-full py-3 px-4 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cyan-600 via-indigo-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed transition shadow-lg shadow-indigo-600/25 flex items-center justify-center space-x-2">
-                <svg v-if="isTesting" class="w-4 h-4 animate-spin text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <svg v-if="isBatchTesting" class="w-4 h-4 animate-spin text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 <span class="text-sm">
-                  {{ isTesting ? (batchStopRequested ? '正在中止中...' : `正在检测 (${concurrency} 并发 · ${finishedTaskCount}/${totalTaskCount} 任务)...`) : (selectedModels.length === 0 ? '请勾选待测模型' : (testMode === 'image' ? `开始生图/编辑检测已选模型 (${selectedModels.length} 个)` : `开始检测已选模型 (${selectedModels.length} 个)`)) }}
+                  {{ isBatchTesting ? (batchStopRequested ? '正在中止中...' : `正在检测 (${concurrency} 并发 · ${finishedTaskCount}/${totalTaskCount} 任务)...`) : (selectedModels.length === 0 ? '请勾选待测模型' : (testMode === 'image' ? `开始生图/编辑检测已选模型 (${selectedModels.length} 个)` : `开始检测已选模型 (${selectedModels.length} 个)`)) }}
                 </span>
               </button>
             </div>
 
             <!-- Batch Progress Bar & Interrupt -->
-            <div v-if="isTesting && totalTaskCount > 0" class="mt-3.5 p-3 rounded-xl border space-y-2 transition-colors"
+            <div v-if="isBatchTesting && totalTaskCount > 0" class="mt-3.5 p-3 rounded-xl border space-y-2 transition-colors"
                  :class="isDarkMode ? 'bg-slate-900 border-indigo-500/30' : 'bg-indigo-50 border-indigo-200'">
               <div class="flex items-center justify-between text-xs">
                 <span class="font-medium text-indigo-500">请求进度: {{ finishedTaskCount }} / {{ totalTaskCount }} · 模型 {{ liveRuns.length }} 个{{ concurrency > 1 ? `（${concurrency} 并发）` : '' }}</span>
@@ -1106,8 +1106,8 @@
 
           </div>
 
-          <!-- Active Test Live Panel (Visible when testing) -->
-          <div v-if="isTesting" class="rounded-2xl p-4 border shadow-xl transition-all space-y-3"
+          <!-- Active Test Live Panel (Visible when batch testing) -->
+          <div v-if="isBatchTesting" class="rounded-2xl p-4 border shadow-xl transition-all space-y-3"
                :class="isDarkMode ? 'glass-dark border-indigo-500/40 bg-indigo-950/20' : 'bg-indigo-50/80 border-indigo-200'">
             <div class="flex items-center justify-between flex-wrap gap-2">
               <div class="flex items-center space-x-2">
@@ -1230,138 +1230,263 @@
                     </td>
 
                     <!-- Chat status -->
-                    <td class="py-3 px-2 text-center overflow-hidden">
-                      <button v-if="isDimUntested(res, 'chat')"
+                    <td class="py-3 px-2 text-center overflow-visible">
+                      <!-- State 1: Running -->
+                      <div v-if="isDimRunning(res.model, 'chat')"
+                           class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold whitespace-nowrap leading-tight min-w-[64px] animate-pulse"
+                           :class="runningBadgeClass('chat')">
+                        <span class="flex items-center space-x-1">
+                          <svg class="w-3 h-3 animate-spin text-current flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span>检测中</span>
+                        </span>
+                        <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">请求中...</span>
+                      </div>
+                      <!-- State 2: Untested -->
+                      <button v-else-if="isDimUntested(res, 'chat')"
                               @click="testSingleDimension(res.model, 'chat')"
-                              :disabled="isTesting"
-                              class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[62px]"
-                              :class="isDarkMode ? 'bg-slate-800/80 hover:bg-cyan-950/40 text-slate-400 hover:text-cyan-300 border-slate-700/60 hover:border-cyan-500/40' : 'bg-slate-100 hover:bg-cyan-50 text-slate-500 hover:text-cyan-700 border-slate-300 hover:border-cyan-300'"
+                              :disabled="isDimRunning(res.model, 'chat')"
+                              class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px] group/btn"
+                              :class="untestedBadgeClass('chat')"
                               title="点击单项检测此模型：基础对话">
                         <span class="flex items-center space-x-1">
-                          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0"></span>
+                          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0 group-hover/btn:bg-current transition-colors"></span>
                           <span>未检测</span>
                         </span>
-                        <span class="text-[9px] font-normal font-mono opacity-60 leading-none mt-0.5">↻ 点击测</span>
+                        <span class="text-[9px] font-normal font-mono opacity-60 group-hover/btn:opacity-100 leading-none mt-0.5">↻ 点击测</span>
                       </button>
-                      <button v-else
-                              @click="openInspector(res, 'chat')" 
-                              class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px]"
-                              :class="dimBadgeClass(res, 'chat')"
-                              title="点击查看完整对话请求与返回报文">
-                        <span class="flex items-center space-x-1">
-                          <span class="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
-                          <span>{{ dimStatusText(res, 'chat') }}</span>
-                        </span>
-                        <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">{{ dimLatencyText(res, 'chat') || '\u00a0' }}</span>
-                      </button>
+                      <!-- State 3: Completed (click to inspect, corner icon to re-test) -->
+                      <div v-else class="relative inline-flex items-center justify-center group/cell">
+                        <button @click="openInspector(res, 'chat')" 
+                                class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px]"
+                                :class="dimBadgeClass(res, 'chat')"
+                                :title="getDimCellTitle(res, 'chat')">
+                          <span class="flex items-center space-x-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
+                            <span>{{ dimStatusText(res, 'chat') }}</span>
+                          </span>
+                          <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">
+                            {{ dimLatencyText(res, 'chat') || '\u00a0' }}
+                          </span>
+                        </button>
+                        <button @click.stop="testSingleDimension(res.model, 'chat')"
+                                :disabled="isDimRunning(res.model, 'chat')"
+                                class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full border shadow-sm flex items-center justify-center text-[10px] font-bold transition-all opacity-0 group-hover/cell:opacity-100 hover:scale-125 z-10 cursor-pointer"
+                                :class="isDarkMode ? 'bg-slate-800 text-slate-200 border-slate-600 hover:bg-cyan-600 hover:text-white' : 'bg-white text-slate-700 border-slate-300 hover:bg-cyan-600 hover:text-white'"
+                                title="单项重新检测 (重跑)">
+                          ↻
+                        </button>
+                      </div>
                     </td>
 
                     <!-- Thinking status -->
-                    <td class="py-3 px-2 text-center overflow-hidden">
-                      <button v-if="isDimUntested(res, 'thinking')"
+                    <td class="py-3 px-2 text-center overflow-visible">
+                      <!-- State 1: Running -->
+                      <div v-if="isDimRunning(res.model, 'thinking')"
+                           class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold whitespace-nowrap leading-tight min-w-[64px] animate-pulse"
+                           :class="runningBadgeClass('thinking')">
+                        <span class="flex items-center space-x-1">
+                          <svg class="w-3 h-3 animate-spin text-current flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span>检测中</span>
+                        </span>
+                        <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">思考中...</span>
+                      </div>
+                      <!-- State 2: Untested -->
+                      <button v-else-if="isDimUntested(res, 'thinking')"
                               @click="testSingleDimension(res.model, 'thinking')"
-                              :disabled="isTesting"
-                              class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[62px]"
-                              :class="isDarkMode ? 'bg-slate-800/80 hover:bg-purple-950/40 text-slate-400 hover:text-purple-300 border-slate-700/60 hover:border-purple-500/40' : 'bg-slate-100 hover:bg-purple-50 text-slate-500 hover:text-purple-700 border-slate-300 hover:border-purple-300'"
+                              :disabled="isDimRunning(res.model, 'thinking')"
+                              class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px] group/btn"
+                              :class="untestedBadgeClass('thinking')"
                               title="点击单项检测此模型：深度思考">
                         <span class="flex items-center space-x-1">
-                          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0"></span>
+                          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0 group-hover/btn:bg-current transition-colors"></span>
                           <span>未检测</span>
                         </span>
-                        <span class="text-[9px] font-normal font-mono opacity-60 leading-none mt-0.5">↻ 点击测</span>
+                        <span class="text-[9px] font-normal font-mono opacity-60 group-hover/btn:opacity-100 leading-none mt-0.5">↻ 点击测</span>
                       </button>
-                      <button v-else
-                              @click="openInspector(res, 'thinking')" 
-                              class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px]"
-                              :class="dimBadgeClass(res, 'thinking')"
-                              :title="res.thinking?.detail || res.thinking?.error || '点击查看完整思考过程报文'">
-                        <span class="flex items-center space-x-1">
-                          <span class="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
-                          <span>{{ dimStatusText(res, 'thinking') }}</span>
-                        </span>
-                        <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">{{ dimLatencyText(res, 'thinking') || '\u00a0' }}</span>
-                      </button>
+                      <!-- State 3: Completed (click to inspect, corner icon to re-test) -->
+                      <div v-else class="relative inline-flex items-center justify-center group/cell">
+                        <button @click="openInspector(res, 'thinking')" 
+                                class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px]"
+                                :class="dimBadgeClass(res, 'thinking')"
+                                :title="getDimCellTitle(res, 'thinking')">
+                          <span class="flex items-center space-x-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
+                            <span>{{ dimStatusText(res, 'thinking') }}</span>
+                          </span>
+                          <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">
+                            {{ dimLatencyText(res, 'thinking') || '\u00a0' }}
+                          </span>
+                        </button>
+                        <button @click.stop="testSingleDimension(res.model, 'thinking')"
+                                :disabled="isDimRunning(res.model, 'thinking')"
+                                class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full border shadow-sm flex items-center justify-center text-[10px] font-bold transition-all opacity-0 group-hover/cell:opacity-100 hover:scale-125 z-10 cursor-pointer"
+                                :class="isDarkMode ? 'bg-slate-800 text-slate-200 border-slate-600 hover:bg-purple-600 hover:text-white' : 'bg-white text-slate-700 border-slate-300 hover:bg-purple-600 hover:text-white'"
+                                title="单项重新检测 (重跑)">
+                          ↻
+                        </button>
+                      </div>
                     </td>
 
                     <!-- Vision status -->
-                    <td class="py-3 px-2 text-center overflow-hidden">
-                      <button v-if="isDimUntested(res, 'vision')"
+                    <td class="py-3 px-2 text-center overflow-visible">
+                      <!-- State 1: Running -->
+                      <div v-if="isDimRunning(res.model, 'vision')"
+                           class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold whitespace-nowrap leading-tight min-w-[64px] animate-pulse"
+                           :class="runningBadgeClass('vision')">
+                        <span class="flex items-center space-x-1">
+                          <svg class="w-3 h-3 animate-spin text-current flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span>检测中</span>
+                        </span>
+                        <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">识别中...</span>
+                      </div>
+                      <!-- State 2: Untested -->
+                      <button v-else-if="isDimUntested(res, 'vision')"
                               @click="testSingleDimension(res.model, 'vision')"
-                              :disabled="isTesting"
-                              class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[62px]"
-                              :class="isDarkMode ? 'bg-slate-800/80 hover:bg-emerald-950/40 text-slate-400 hover:text-emerald-300 border-slate-700/60 hover:border-emerald-500/40' : 'bg-slate-100 hover:bg-emerald-50 text-slate-500 hover:text-emerald-700 border-slate-300 hover:border-emerald-300'"
+                              :disabled="isDimRunning(res.model, 'vision')"
+                              class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px] group/btn"
+                              :class="untestedBadgeClass('vision')"
                               title="点击单项检测此模型：图像视觉">
                         <span class="flex items-center space-x-1">
-                          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0"></span>
+                          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0 group-hover/btn:bg-current transition-colors"></span>
                           <span>未检测</span>
                         </span>
-                        <span class="text-[9px] font-normal font-mono opacity-60 leading-none mt-0.5">↻ 点击测</span>
+                        <span class="text-[9px] font-normal font-mono opacity-60 group-hover/btn:opacity-100 leading-none mt-0.5">↻ 点击测</span>
                       </button>
-                      <button v-else
-                              @click="openInspector(res, 'vision')" 
-                              class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px]"
-                              :class="dimBadgeClass(res, 'vision')"
-                              :title="res.vision?.detail || res.vision?.error || '点击查看完整视觉请求与返回报文'">
-                        <span class="flex items-center space-x-1">
-                          <span class="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
-                          <span>{{ dimStatusText(res, 'vision') }}</span>
-                        </span>
-                        <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">{{ dimLatencyText(res, 'vision') || '\u00a0' }}</span>
-                      </button>
+                      <!-- State 3: Completed (click to inspect, corner icon to re-test) -->
+                      <div v-else class="relative inline-flex items-center justify-center group/cell">
+                        <button @click="openInspector(res, 'vision')" 
+                                class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px]"
+                                :class="dimBadgeClass(res, 'vision')"
+                                :title="getDimCellTitle(res, 'vision')">
+                          <span class="flex items-center space-x-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
+                            <span>{{ dimStatusText(res, 'vision') }}</span>
+                          </span>
+                          <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">
+                            {{ dimLatencyText(res, 'vision') || '\u00a0' }}
+                          </span>
+                        </button>
+                        <button @click.stop="testSingleDimension(res.model, 'vision')"
+                                :disabled="isDimRunning(res.model, 'vision')"
+                                class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full border shadow-sm flex items-center justify-center text-[10px] font-bold transition-all opacity-0 group-hover/cell:opacity-100 hover:scale-125 z-10 cursor-pointer"
+                                :class="isDarkMode ? 'bg-slate-800 text-slate-200 border-slate-600 hover:bg-emerald-600 hover:text-white' : 'bg-white text-slate-700 border-slate-300 hover:bg-emerald-600 hover:text-white'"
+                                title="单项重新检测 (重跑)">
+                          ↻
+                        </button>
+                      </div>
                     </td>
 
                     <!-- Tools status -->
-                    <td class="py-3 px-2 text-center overflow-hidden">
-                      <button v-if="isDimUntested(res, 'tools')"
+                    <td class="py-3 px-2 text-center overflow-visible">
+                      <!-- State 1: Running -->
+                      <div v-if="isDimRunning(res.model, 'tools')"
+                           class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold whitespace-nowrap leading-tight min-w-[64px] animate-pulse"
+                           :class="runningBadgeClass('tools')">
+                        <span class="flex items-center space-x-1">
+                          <svg class="w-3 h-3 animate-spin text-current flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span>检测中</span>
+                        </span>
+                        <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">调用中...</span>
+                      </div>
+                      <!-- State 2: Untested -->
+                      <button v-else-if="isDimUntested(res, 'tools')"
                               @click="testSingleDimension(res.model, 'tools')"
-                              :disabled="isTesting"
-                              class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[62px]"
-                              :class="isDarkMode ? 'bg-slate-800/80 hover:bg-indigo-950/40 text-slate-400 hover:text-indigo-300 border-slate-700/60 hover:border-indigo-500/40' : 'bg-slate-100 hover:bg-indigo-50 text-slate-500 hover:text-indigo-700 border-slate-300 hover:border-indigo-300'"
+                              :disabled="isDimRunning(res.model, 'tools')"
+                              class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px] group/btn"
+                              :class="untestedBadgeClass('tools')"
                               title="点击单项检测此模型：原生工具调用">
                         <span class="flex items-center space-x-1">
-                          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0"></span>
+                          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0 group-hover/btn:bg-current transition-colors"></span>
                           <span>未检测</span>
                         </span>
-                        <span class="text-[9px] font-normal font-mono opacity-60 leading-none mt-0.5">↻ 点击测</span>
+                        <span class="text-[9px] font-normal font-mono opacity-60 group-hover/btn:opacity-100 leading-none mt-0.5">↻ 点击测</span>
                       </button>
-                      <button v-else
-                              @click="openInspector(res, 'tools')" 
-                              class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px]"
-                              :class="dimBadgeClass(res, 'tools')"
-                              :title="res.tools?.detail || res.tools?.error || '点击查看完整工具调用请求与返回报文'">
-                        <span class="flex items-center space-x-1">
-                          <span class="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
-                          <span>{{ dimStatusText(res, 'tools') }}</span>
-                        </span>
-                        <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">{{ dimLatencyText(res, 'tools') || '\u00a0' }}</span>
-                      </button>
+                      <!-- State 3: Completed (click to inspect, corner icon to re-test) -->
+                      <div v-else class="relative inline-flex items-center justify-center group/cell">
+                        <button @click="openInspector(res, 'tools')" 
+                                class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px]"
+                                :class="dimBadgeClass(res, 'tools')"
+                                :title="getDimCellTitle(res, 'tools')">
+                          <span class="flex items-center space-x-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
+                            <span>{{ dimStatusText(res, 'tools') }}</span>
+                          </span>
+                          <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">
+                            {{ dimLatencyText(res, 'tools') || '\u00a0' }}
+                          </span>
+                        </button>
+                        <button @click.stop="testSingleDimension(res.model, 'tools')"
+                                :disabled="isDimRunning(res.model, 'tools')"
+                                class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full border shadow-sm flex items-center justify-center text-[10px] font-bold transition-all opacity-0 group-hover/cell:opacity-100 hover:scale-125 z-10 cursor-pointer"
+                                :class="isDarkMode ? 'bg-slate-800 text-slate-200 border-slate-600 hover:bg-indigo-600 hover:text-white' : 'bg-white text-slate-700 border-slate-300 hover:bg-indigo-600 hover:text-white'"
+                                title="单项重新检测 (重跑)">
+                          ↻
+                        </button>
+                      </div>
                     </td>
 
                     <!-- Pelican status -->
-                    <td class="py-3 px-2 text-center overflow-hidden">
-                      <button v-if="isDimUntested(res, 'pelican')"
+                    <td class="py-3 px-2 text-center overflow-visible">
+                      <!-- State 1: Running -->
+                      <div v-if="isDimRunning(res.model, 'pelican')"
+                           class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold whitespace-nowrap leading-tight min-w-[64px] animate-pulse"
+                           :class="runningBadgeClass('pelican')">
+                        <span class="flex items-center space-x-1">
+                          <svg class="w-3 h-3 animate-spin text-current flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span>检测中</span>
+                        </span>
+                        <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">生成中...</span>
+                      </div>
+                      <!-- State 2: Untested -->
+                      <button v-else-if="isDimUntested(res, 'pelican')"
                               @click="testSingleDimension(res.model, 'pelican')"
-                              :disabled="isTesting"
-                              class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[62px]"
-                              :class="isDarkMode ? 'bg-slate-800/80 hover:bg-amber-950/40 text-slate-400 hover:text-amber-300 border-slate-700/60 hover:border-amber-500/40' : 'bg-slate-100 hover:bg-amber-50 text-slate-500 hover:text-amber-700 border-slate-300 hover:border-amber-300'"
+                              :disabled="isDimRunning(res.model, 'pelican')"
+                              class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px] group/btn"
+                              :class="untestedBadgeClass('pelican')"
                               title="点击单项检测此模型：鹈鹕单车 SVG">
                         <span class="flex items-center space-x-1">
-                          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0"></span>
+                          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0 group-hover/btn:bg-current transition-colors"></span>
                           <span>未检测</span>
                         </span>
-                        <span class="text-[9px] font-normal font-mono opacity-60 leading-none mt-0.5">↻ 点击测</span>
+                        <span class="text-[9px] font-normal font-mono opacity-60 group-hover/btn:opacity-100 leading-none mt-0.5">↻ 点击测</span>
                       </button>
-                      <button v-else
-                              @click="res.pelican?.htmlCode ? openPelicanRenderer(res.model) : openInspector(res, 'pelican')" 
-                              class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px]"
-                              :class="dimBadgeClass(res, 'pelican')"
-                              :title="res.pelican?.detail || res.pelican?.error || '点击查看鹈鹕 SVG 动画'">
-                        <span class="flex items-center space-x-1">
-                          <span class="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
-                          <span>{{ dimStatusText(res, 'pelican') }}</span>
-                        </span>
-                        <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">{{ dimLatencyText(res, 'pelican') || '\u00a0' }}</span>
-                      </button>
+                      <!-- State 3: Completed (click to render/inspect, corner icon to re-test) -->
+                      <div v-else class="relative inline-flex items-center justify-center group/cell">
+                        <button @click="res.pelican?.htmlCode ? openPelicanRenderer(res.model) : openInspector(res, 'pelican')"
+                                class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px]"
+                                :class="dimBadgeClass(res, 'pelican')"
+                                :title="getDimCellTitle(res, 'pelican')">
+                          <span class="flex items-center space-x-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
+                            <span>{{ dimStatusText(res, 'pelican') }}</span>
+                          </span>
+                          <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">
+                            {{ dimLatencyText(res, 'pelican') || '\u00a0' }}
+                          </span>
+                        </button>
+                        <button @click.stop="testSingleDimension(res.model, 'pelican')"
+                                :disabled="isDimRunning(res.model, 'pelican')"
+                                class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full border shadow-sm flex items-center justify-center text-[10px] font-bold transition-all opacity-0 group-hover/cell:opacity-100 hover:scale-125 z-10 cursor-pointer"
+                                :class="isDarkMode ? 'bg-slate-800 text-slate-200 border-slate-600 hover:bg-amber-600 hover:text-white' : 'bg-white text-slate-700 border-slate-300 hover:bg-amber-600 hover:text-white'"
+                                title="单项重新检测 (重跑)">
+                          ↻
+                        </button>
+                      </div>
                     </td>
 
                     <!-- Latency -->
@@ -1382,7 +1507,7 @@
                           <svg class="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
                           <span class="hidden xl:inline">详情</span>
                         </button>
-                        <button @click="testSingleDirect(res.model)" :disabled="isTesting"
+                        <button @click="testSingleDirect(res.model)" :disabled="isModelRunning(res.model)"
                                 class="px-2 py-1 text-xs rounded-lg border transition flex-shrink-0 flex items-center space-x-1 leading-none shadow-sm"
                                 :class="isDarkMode ? 'bg-slate-800 hover:bg-indigo-950/40 text-slate-300 hover:text-indigo-300 border-slate-700 hover:border-indigo-500/50' : 'bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border-slate-300 hover:border-indigo-300'"
                                 title="单项重新检测此模型的所有维度">
@@ -1429,18 +1554,37 @@
                     </td>
 
                     <!-- Image Gen Status -->
-                    <td class="py-3 px-2 text-center overflow-hidden">
+                    <td class="py-3 px-2 text-center overflow-visible">
                       <div class="flex items-center justify-center space-x-2">
-                        <button v-if="isDimUntested(res, 'image_gen')"
+                        <!-- State 1: Running -->
+                        <div v-if="isDimRunning(res.model, 'image_gen')"
+                             class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold whitespace-nowrap leading-tight min-w-[64px] animate-pulse"
+                             :class="runningBadgeClass('image_gen')">
+                          <span class="flex items-center space-x-1">
+                            <svg class="w-3 h-3 animate-spin text-current flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>生图中</span>
+                          </span>
+                          <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">请求中...</span>
+                        </div>
+
+                        <!-- State 2: Untested -->
+                        <button v-else-if="isDimUntested(res, 'image_gen')"
                                 @click="testSingleDimension(res.model, 'image_gen')"
-                                :disabled="isTesting"
-                                class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap"
-                                :class="isDarkMode ? 'bg-slate-800/80 hover:bg-pink-950/40 text-slate-400 hover:text-pink-300 border-slate-700/60 hover:border-pink-500/40' : 'bg-slate-100 hover:bg-pink-50 text-slate-500 hover:text-pink-700 border-slate-300 hover:border-pink-300'"
+                                :disabled="isDimRunning(res.model, 'image_gen')"
+                                class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px] group/btn"
+                                :class="untestedBadgeClass('image_gen')"
                                 title="点击单项检测此模型：图片生成">
-                          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0"></span>
-                          <span>未检测</span>
-                          <span class="text-[10px] ml-0.5 opacity-60 hover:opacity-100">↻</span>
+                          <span class="flex items-center space-x-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0 group-hover/btn:bg-current transition-colors"></span>
+                            <span>未检测</span>
+                          </span>
+                          <span class="text-[9px] font-normal font-mono opacity-60 group-hover/btn:opacity-100 leading-none mt-0.5">↻ 点击测</span>
                         </button>
+
+                        <!-- State 3: Completed -->
                         <template v-else>
                           <img v-if="res.image_gen?.imageUrl" 
                                :src="res.image_gen.imageUrl" 
@@ -1448,33 +1592,64 @@
                                class="w-8 h-8 rounded-lg object-cover border border-emerald-500/40 cursor-pointer shadow-sm hover:scale-110 transition flex-shrink-0"
                                :title="'点击放大全屏查看: ' + res.image_gen.prompt" />
                           
-                          <button @click="openInspector(res, 'image_gen')"
-                                  class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[62px]"
-                                  :class="dimBadgeClass(res, 'image_gen')"
-                                  :title="res.image_gen?.detail || res.image_gen?.error || '点击查看完整生图报文'">
-                            <span class="flex items-center space-x-1">
-                              <span class="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
-                              <span>{{ dimStatusText(res, 'image_gen') }}</span>
-                            </span>
-                            <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">{{ dimLatencyText(res, 'image_gen') || '\u00a0' }}</span>
-                          </button>
+                          <div class="relative inline-flex items-center justify-center group/cell">
+                            <button @click="openInspector(res, 'image_gen')"
+                                    class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[62px]"
+                                    :class="dimBadgeClass(res, 'image_gen')"
+                                    :title="getDimCellTitle(res, 'image_gen')">
+                              <span class="flex items-center space-x-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
+                                <span>{{ dimStatusText(res, 'image_gen') }}</span>
+                              </span>
+                              <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">
+                                {{ dimLatencyText(res, 'image_gen') || '\u00a0' }}
+                              </span>
+                            </button>
+
+                            <button @click.stop="testSingleDimension(res.model, 'image_gen')"
+                                    :disabled="isDimRunning(res.model, 'image_gen')"
+                                    class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full border shadow-sm flex items-center justify-center text-[10px] font-bold transition-all opacity-0 group-hover/cell:opacity-100 hover:scale-125 z-10 cursor-pointer"
+                                    :class="isDarkMode ? 'bg-slate-800 text-slate-200 border-slate-600 hover:bg-pink-600 hover:text-white' : 'bg-white text-slate-700 border-slate-300 hover:bg-pink-600 hover:text-white'"
+                                    title="单项重新检测 (重跑)">
+                              ↻
+                            </button>
+                          </div>
                         </template>
                       </div>
                     </td>
 
                     <!-- Image Edit Status -->
-                    <td class="py-3 px-2 text-center overflow-hidden">
+                    <td class="py-3 px-2 text-center overflow-visible">
                       <div class="flex items-center justify-center space-x-2">
-                        <button v-if="isDimUntested(res, 'image_edit')"
+                        <!-- State 1: Running -->
+                        <div v-if="isDimRunning(res.model, 'image_edit')"
+                             class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold whitespace-nowrap leading-tight min-w-[64px] animate-pulse"
+                             :class="runningBadgeClass('image_edit')">
+                          <span class="flex items-center space-x-1">
+                            <svg class="w-3 h-3 animate-spin text-current flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>编辑中</span>
+                          </span>
+                          <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">渲染中...</span>
+                        </div>
+
+                        <!-- State 2: Untested -->
+                        <button v-else-if="isDimUntested(res, 'image_edit')"
                                 @click="testSingleDimension(res.model, 'image_edit')"
-                                :disabled="isTesting"
-                                class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap"
-                                :class="isDarkMode ? 'bg-slate-800/80 hover:bg-rose-950/40 text-slate-400 hover:text-rose-300 border-slate-700/60 hover:border-rose-500/40' : 'bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-700 border-slate-300 hover:border-rose-300'"
+                                :disabled="isDimRunning(res.model, 'image_edit')"
+                                class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px] group/btn"
+                                :class="untestedBadgeClass('image_edit')"
                                 title="点击单项检测此模型：图片编辑">
-                          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0"></span>
-                          <span>未检测</span>
-                          <span class="text-[10px] ml-0.5 opacity-60 hover:opacity-100">↻</span>
+                          <span class="flex items-center space-x-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0 group-hover/btn:bg-current transition-colors"></span>
+                            <span>未检测</span>
+                          </span>
+                          <span class="text-[9px] font-normal font-mono opacity-60 group-hover/btn:opacity-100 leading-none mt-0.5">↻ 点击测</span>
                         </button>
+
+                        <!-- State 3: Completed (click to inspect, corner icon to re-test) -->
                         <template v-else>
                           <img v-if="res.image_edit?.imageUrl" 
                                :src="res.image_edit.imageUrl" 
@@ -1482,16 +1657,28 @@
                                class="w-8 h-8 rounded-lg object-cover border border-emerald-500/40 cursor-pointer shadow-sm hover:scale-110 transition flex-shrink-0"
                                :title="'点击放大全屏查看: ' + res.image_edit.prompt" />
                           
-                          <button @click="openInspector(res, 'image_edit')"
-                                  class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[62px]"
-                                  :class="dimBadgeClass(res, 'image_edit')"
-                                  :title="res.image_edit?.detail || res.image_edit?.error || '点击查看完整编辑报文'">
-                            <span class="flex items-center space-x-1">
-                              <span class="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
-                              <span>{{ dimStatusText(res, 'image_edit') }}</span>
-                            </span>
-                            <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">{{ dimLatencyText(res, 'image_edit') || '\u00a0' }}</span>
-                          </button>
+                          <div class="relative inline-flex items-center justify-center group/cell">
+                            <button @click="openInspector(res, 'image_edit')"
+                                    class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[62px]"
+                                    :class="dimBadgeClass(res, 'image_edit')"
+                                    :title="getDimCellTitle(res, 'image_edit')">
+                              <span class="flex items-center space-x-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
+                                <span>{{ dimStatusText(res, 'image_edit') }}</span>
+                              </span>
+                              <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">
+                                {{ dimLatencyText(res, 'image_edit') || '\u00a0' }}
+                              </span>
+                            </button>
+
+                            <button @click.stop="testSingleDimension(res.model, 'image_edit')"
+                                    :disabled="isDimRunning(res.model, 'image_edit')"
+                                    class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full border shadow-sm flex items-center justify-center text-[10px] font-bold transition-all opacity-0 group-hover/cell:opacity-100 hover:scale-125 z-10 cursor-pointer"
+                                    :class="isDarkMode ? 'bg-slate-800 text-slate-200 border-slate-600 hover:bg-rose-600 hover:text-white' : 'bg-white text-slate-700 border-slate-300 hover:bg-rose-600 hover:text-white'"
+                                    title="单项重新检测 (重跑)">
+                              ↻
+                            </button>
+                          </div>
                         </template>
                       </div>
                     </td>
@@ -1514,7 +1701,7 @@
                           <svg class="w-3.5 h-3.5 text-pink-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
                           <span class="hidden xl:inline">详情</span>
                         </button>
-                        <button @click="testSingleDirect(res.model)" :disabled="isTesting"
+                        <button @click="testSingleDirect(res.model)" :disabled="isModelRunning(res.model)"
                                 class="px-2 py-1 text-xs rounded-lg border transition flex-shrink-0 flex items-center space-x-1 leading-none shadow-sm"
                                 :class="isDarkMode ? 'bg-slate-800 hover:bg-pink-950/40 text-slate-300 hover:text-pink-300 border-slate-700 hover:border-pink-500/50' : 'bg-slate-100 hover:bg-pink-50 text-slate-700 hover:text-pink-700 border-slate-300 hover:border-pink-300'"
                                 title="单项重新检测此模型的所有维度">
@@ -1566,7 +1753,15 @@
                       <span>🧠</span>
                       <span>思考输出</span>
                     </span>
-                    <span class="text-xs font-bold">{{ res.thinking?.supported ? '✓ 支持' : (isDimUntested(res, 'thinking') ? '— 未检测' : (res.network?.thinking?.timedOut ? '⏱ 超时' : '✕ 无思考')) }}</span>
+                    <div class="flex items-center space-x-1.5">
+                      <span class="text-xs font-bold">{{ isDimRunning(res.model, 'thinking') ? '⏳ 检测中' : (res.thinking?.supported ? '✓ 支持' : (isDimUntested(res, 'thinking') ? '— 未检测' : (res.network?.thinking?.timedOut ? '⏱ 超时' : '✕ 无思考'))) }}</span>
+                      <button @click.stop="testSingleDimension(res.model, 'thinking')"
+                              :disabled="isDimRunning(res.model, 'thinking')"
+                              class="p-0.5 rounded text-[11px] leading-none opacity-60 hover:opacity-100 hover:scale-125 transition"
+                              :title="isDimUntested(res, 'thinking') ? '点击检测思考维度' : '点击重新检测思考维度'">
+                        ↻
+                      </button>
+                    </div>
                   </div>
                   <div class="text-[10px] mt-2 truncate opacity-80" :title="res.thinking?.detail || res.thinking?.error">
                     {{ res.thinking?.supported ? (res.thinking.detail || formatDuration(res.thinking.latency)) : (isDimUntested(res, 'thinking') ? '未选择检测该项' : (res.thinking?.latency ? `${res.thinking?.error || '普通无思考链'} (${formatDuration(res.thinking.latency)})` : (res.thinking?.error || '普通无思考链'))) }}
@@ -1574,16 +1769,24 @@
                 </div>
 
                 <!-- Pelican Pill -->
-                <div @click="openInspector(res, 'pelican')"
+                <div @click="res.pelican?.htmlCode ? openPelicanRenderer(res.model) : openInspector(res, 'pelican')"
                      class="p-2.5 rounded-xl border flex flex-col justify-between cursor-pointer transition hover:scale-[1.02] active:scale-[0.98]"
                      :class="cardDimClass(res, 'pelican')"
-                     title="点击查看鹈鹕 SVG 动画报文">
+                     :title="res.pelican?.htmlCode ? '点击查看鹈鹕 SVG 动画沙箱渲染' : '点击查看鹈鹕完整报文'">
                   <div class="flex items-center justify-between">
                     <span class="font-bold flex items-center space-x-1">
                       <span>🚲</span>
                       <span>鹈鹕单车</span>
                     </span>
-                    <span class="text-xs font-bold">{{ res.pelican?.supported ? '✓ SVG动画' : (isDimUntested(res, 'pelican') ? '— 未检测' : (res.network?.pelican?.timedOut ? '⏱ 超时' : '✕ 不支持')) }}</span>
+                    <div class="flex items-center space-x-1.5">
+                      <span class="text-xs font-bold">{{ isDimRunning(res.model, 'pelican') ? '⏳ 检测中' : (res.pelican?.supported ? '✓ SVG动画' : (isDimUntested(res, 'pelican') ? '— 未检测' : (res.network?.pelican?.timedOut ? '⏱ 超时' : '✕ 不支持'))) }}</span>
+                      <button @click.stop="testSingleDimension(res.model, 'pelican')"
+                              :disabled="isDimRunning(res.model, 'pelican')"
+                              class="p-0.5 rounded text-[11px] leading-none opacity-60 hover:opacity-100 hover:scale-125 transition"
+                              :title="isDimUntested(res, 'pelican') ? '点击检测鹈鹕维度' : '点击重新检测鹈鹕维度'">
+                        ↻
+                      </button>
+                    </div>
                   </div>
                   <div class="text-[10px] mt-2 truncate opacity-80" :title="res.pelican?.detail || res.pelican?.error">
                     {{ res.pelican?.supported ? (res.pelican.detail || formatDuration(res.pelican.latency)) : (isDimUntested(res, 'pelican') ? '未选择检测该项' : (res.pelican?.latency ? `${res.pelican?.error || '未生成有效SVG'} (${formatDuration(res.pelican.latency)})` : (res.pelican?.error || '未生成有效SVG'))) }}
@@ -1600,7 +1803,15 @@
                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                       <span>视觉 (Vision)</span>
                     </span>
-                    <span class="text-xs font-bold">{{ res.vision.supported ? '✓ 支持' : (isDimUntested(res, 'vision') ? '— 未检测' : (res.network?.vision?.timedOut ? '⏱ 超时' : '✕ 不支持')) }}</span>
+                    <div class="flex items-center space-x-1.5">
+                      <span class="text-xs font-bold">{{ isDimRunning(res.model, 'vision') ? '⏳ 检测中' : (res.vision.supported ? '✓ 支持' : (isDimUntested(res, 'vision') ? '— 未检测' : (res.network?.vision?.timedOut ? '⏱ 超时' : '✕ 不支持'))) }}</span>
+                      <button @click.stop="testSingleDimension(res.model, 'vision')"
+                              :disabled="isDimRunning(res.model, 'vision')"
+                              class="p-0.5 rounded text-[11px] leading-none opacity-60 hover:opacity-100 hover:scale-125 transition"
+                              :title="isDimUntested(res, 'vision') ? '点击检测视觉维度' : '点击重新检测视觉维度'">
+                        ↻
+                      </button>
+                    </div>
                   </div>
                   <div class="text-[10px] mt-2 truncate opacity-80" :title="res.vision.detail || res.vision.error">
                     {{ res.vision.supported ? (res.vision.detail || `识别正常 (${formatDuration(res.vision.latency)})`) : (isDimUntested(res, 'vision') ? '未选择检测该项' : (res.vision.latency ? `${res.vision.error || '无多模态权限'} (${formatDuration(res.vision.latency)})` : (res.vision.error || '无多模态权限'))) }}
@@ -1617,7 +1828,15 @@
                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                       <span>工具 (Tools)</span>
                     </span>
-                    <span class="text-xs font-bold">{{ res.tools.supported ? '✓ 支持' : (isDimUntested(res, 'tools') ? '— 未检测' : (res.tools.simulated ? '⚠️ 模拟' : (res.network?.tools?.timedOut ? '⏱ 超时' : '✕ 不支持'))) }}</span>
+                    <div class="flex items-center space-x-1.5">
+                      <span class="text-xs font-bold">{{ isDimRunning(res.model, 'tools') ? '⏳ 检测中' : (res.tools.supported ? '✓ 支持' : (isDimUntested(res, 'tools') ? '— 未检测' : (res.tools.simulated ? '⚠️ 模拟' : (res.network?.tools?.timedOut ? '⏱ 超时' : '✕ 不支持')))) }}</span>
+                      <button @click.stop="testSingleDimension(res.model, 'tools')"
+                              :disabled="isDimRunning(res.model, 'tools')"
+                              class="p-0.5 rounded text-[11px] leading-none opacity-60 hover:opacity-100 hover:scale-125 transition"
+                              :title="isDimUntested(res, 'tools') ? '点击检测工具维度' : '点击重新检测工具维度'">
+                        ↻
+                      </button>
+                    </div>
                   </div>
                   <div class="text-[10px] mt-2 truncate opacity-80" :title="res.tools.detail || res.tools.error">
                     {{ res.tools.supported ? (res.tools.detail || `已触发 (${formatDuration(res.tools.latency)})`) : (isDimUntested(res, 'tools') ? '未选择检测该项' : (res.tools.latency ? `${res.tools.error || '不支持 tools'} (${formatDuration(res.tools.latency)})` : (res.tools.error || '不支持 tools'))) }}
@@ -1643,8 +1862,14 @@
               <!-- Footer -->
               <div class="pt-2 border-t flex items-center justify-between text-xs"
                    :class="isDarkMode ? 'border-slate-800' : 'border-slate-200'">
-                <span class="text-[11px] font-mono" :class="isDarkMode ? 'text-slate-500' : 'text-slate-400'">
-                  基础对话: {{ res.chat.supported ? formatDuration(res.chat.latency) : (isDimUntested(res, 'chat') ? '未检测' : '失败') }}
+                <span class="text-[11px] font-mono flex items-center space-x-1" :class="isDarkMode ? 'text-slate-500' : 'text-slate-400'">
+                  <span>基础对话: {{ isDimRunning(res.model, 'chat') ? '⏳ 检测中' : (res.chat.supported ? formatDuration(res.chat.latency) : (isDimUntested(res, 'chat') ? '未检测' : '失败')) }}</span>
+                  <button @click.stop="testSingleDimension(res.model, 'chat')"
+                          :disabled="isDimRunning(res.model, 'chat')"
+                          class="p-0.5 rounded text-[11px] leading-none opacity-60 hover:opacity-100 hover:scale-125 transition"
+                          :title="isDimUntested(res, 'chat') ? '点击检测对话维度' : '点击重新检测对话维度'">
+                    ↻
+                  </button>
                 </span>
                 <div class="flex items-center space-x-2">
                   <button v-if="res.pelican?.htmlCode"
@@ -1652,7 +1877,7 @@
                           class="text-xs font-bold text-amber-400 hover:underline flex items-center space-x-1">
                     <span>🎨 渲染动画</span>
                   </button>
-                  <button @click="testSingleDirect(res.model)" :disabled="isTesting" class="text-xs text-indigo-500 hover:underline">
+                  <button @click="testSingleDirect(res.model)" :disabled="isModelRunning(res.model)" class="text-xs text-indigo-500 hover:underline">
                     重新检测
                   </button>
                 </div>
@@ -1699,7 +1924,15 @@
                       <span>🎨</span>
                       <span>图片生成</span>
                     </span>
-                    <span class="text-xs font-bold">{{ res.image_gen?.supported ? '✓ 成功' : (isDimUntested(res, 'image_gen') ? '— 未检测' : (res.network?.image_gen?.timedOut ? '⏱ 超时' : '✕ 失败')) }}</span>
+                    <div class="flex items-center space-x-1.5">
+                      <span class="text-xs font-bold">{{ isDimRunning(res.model, 'image_gen') ? '⏳ 生图中' : (res.image_gen?.supported ? '✓ 成功' : (isDimUntested(res, 'image_gen') ? '— 未检测' : (res.network?.image_gen?.timedOut ? '⏱ 超时' : '✕ 失败'))) }}</span>
+                      <button @click.stop="testSingleDimension(res.model, 'image_gen')"
+                              :disabled="isDimRunning(res.model, 'image_gen')"
+                              class="p-0.5 rounded text-[11px] leading-none opacity-60 hover:opacity-100 hover:scale-125 transition"
+                              :title="isDimUntested(res, 'image_gen') ? '点击检测图片生成' : '点击重新检测图片生成'">
+                        ↻
+                      </button>
+                    </div>
                   </div>
 
                   <!-- Thumbnail & prompt -->
@@ -1730,7 +1963,15 @@
                       <span>✏️</span>
                       <span>图片编辑</span>
                     </span>
-                    <span class="text-xs font-bold">{{ res.image_edit?.supported ? '✓ 成功' : (isDimUntested(res, 'image_edit') ? '— 未检测' : (res.network?.image_edit?.timedOut ? '⏱ 超时' : '✕ 失败')) }}</span>
+                    <div class="flex items-center space-x-1.5">
+                      <span class="text-xs font-bold">{{ isDimRunning(res.model, 'image_edit') ? '⏳ 编辑中' : (res.image_edit?.supported ? '✓ 成功' : (isDimUntested(res, 'image_edit') ? '— 未检测' : (res.network?.image_edit?.timedOut ? '⏱ 超时' : '✕ 失败'))) }}</span>
+                      <button @click.stop="testSingleDimension(res.model, 'image_edit')"
+                              :disabled="isDimRunning(res.model, 'image_edit')"
+                              class="p-0.5 rounded text-[11px] leading-none opacity-60 hover:opacity-100 hover:scale-125 transition"
+                              :title="isDimUntested(res, 'image_edit') ? '点击检测图片编辑' : '点击重新检测图片编辑'">
+                        ↻
+                      </button>
+                    </div>
                   </div>
 
                   <!-- Visual comparison in card -->
@@ -1758,7 +1999,7 @@
                 <button @click="openInspector(res, res.image_gen?.supported ? 'image_gen' : 'image_edit')" class="text-xs text-pink-400 hover:underline">
                   查看抓包报文
                 </button>
-                <button @click="testSingleDirect(res.model)" :disabled="isTesting" class="text-xs text-indigo-400 hover:underline">
+                <button @click="testSingleDirect(res.model)" :disabled="isModelRunning(res.model)" class="text-xs text-indigo-400 hover:underline">
                   重新检测
                 </button>
               </div>
@@ -3851,8 +4092,18 @@
 
         // Execution States
         const isTesting = ref(false);
+        const isBatchTesting = ref(false);
         const testingModelId = ref('');
         const batchStopRequested = ref(false);
+        const activeTestingDims = reactive({});
+
+        const isDimRunning = (modelId, dimKey) => {
+          return !!activeTestingDims[`${modelId}:${dimKey}`];
+        };
+
+        const isModelRunning = (modelId) => {
+          return testingModelId.value === modelId || Object.keys(activeTestingDims).some(k => k.startsWith(`${modelId}:`));
+        };
 
         // 并发运行时：每个模型一条实时状态（模型 × 维度任务池）
         const liveRuns = ref([]);
@@ -4145,7 +4396,7 @@
         const isDimUntested = (res, key) => {
           const d = res?.[key];
           if (!d) return true;
-          if (d.error === '跳过检测' || d.error === '检测被中止，未执行') return true;
+          if (d.error === '跳过检测' || d.error === '未选择检测' || d.error === '检测被中止，未执行' || d.error === '未执行' || d.error === '未检测') return true;
           if (key === 'image_gen') {
             if (d.supported || d.imageUrl || (typeof d.latency === 'number' && d.latency > 0) || res?.network?.image_gen) return false;
             return true;
@@ -4239,6 +4490,63 @@
             return isDarkMode.value ? 'bg-emerald-950/30 border-emerald-800/50 text-emerald-400 hover:border-emerald-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:border-emerald-300';
           }
           return isDarkMode.value ? 'bg-rose-950/30 border-rose-800/50 text-rose-400 hover:border-rose-700' : 'bg-rose-50 border-rose-200 text-rose-700 hover:border-rose-300';
+        };
+
+        // 未检测状态按钮配色
+        const untestedBadgeClass = (key) => {
+          const isDark = isDarkMode.value;
+          switch (key) {
+            case 'chat':
+              return isDark ? 'bg-slate-800/80 hover:bg-cyan-950/40 text-slate-400 hover:text-cyan-300 border-slate-700/60 hover:border-cyan-500/40' : 'bg-slate-100 hover:bg-cyan-50 text-slate-500 hover:text-cyan-700 border-slate-300 hover:border-cyan-300';
+            case 'thinking':
+              return isDark ? 'bg-slate-800/80 hover:bg-purple-950/40 text-slate-400 hover:text-purple-300 border-slate-700/60 hover:border-purple-500/40' : 'bg-slate-100 hover:bg-purple-50 text-slate-500 hover:text-purple-700 border-slate-300 hover:border-purple-300';
+            case 'vision':
+              return isDark ? 'bg-slate-800/80 hover:bg-emerald-950/40 text-slate-400 hover:text-emerald-300 border-slate-700/60 hover:border-emerald-500/40' : 'bg-slate-100 hover:bg-emerald-50 text-slate-500 hover:text-emerald-700 border-slate-300 hover:border-emerald-300';
+            case 'tools':
+              return isDark ? 'bg-slate-800/80 hover:bg-indigo-950/40 text-slate-400 hover:text-indigo-300 border-slate-700/60 hover:border-indigo-500/40' : 'bg-slate-100 hover:bg-indigo-50 text-slate-500 hover:text-indigo-700 border-slate-300 hover:border-indigo-300';
+            case 'pelican':
+              return isDark ? 'bg-slate-800/80 hover:bg-amber-950/40 text-slate-400 hover:text-amber-300 border-slate-700/60 hover:border-amber-500/40' : 'bg-slate-100 hover:bg-amber-50 text-slate-500 hover:text-amber-700 border-slate-300 hover:border-amber-300';
+            case 'image_gen':
+              return isDark ? 'bg-slate-800/80 hover:bg-pink-950/40 text-slate-400 hover:text-pink-300 border-slate-700/60 hover:border-pink-500/40' : 'bg-slate-100 hover:bg-pink-50 text-slate-500 hover:text-pink-700 border-slate-300 hover:border-pink-300';
+            case 'image_edit':
+              return isDark ? 'bg-slate-800/80 hover:bg-rose-950/40 text-slate-400 hover:text-rose-300 border-slate-700/60 hover:border-rose-500/40' : 'bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-700 border-slate-300 hover:border-rose-300';
+            default:
+              return isDark ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-500 border-slate-300';
+          }
+        };
+
+        // 正在检测中状态气泡配色
+        const runningBadgeClass = (key) => {
+          const isDark = isDarkMode.value;
+          switch (key) {
+            case 'chat':
+              return isDark ? 'bg-cyan-950/40 text-cyan-300 border-cyan-500/50' : 'bg-cyan-50 text-cyan-600 border-cyan-300';
+            case 'thinking':
+              return isDark ? 'bg-purple-950/40 text-purple-300 border-purple-500/50' : 'bg-purple-50 text-purple-600 border-purple-300';
+            case 'vision':
+              return isDark ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/50' : 'bg-emerald-50 text-emerald-600 border-emerald-300';
+            case 'tools':
+              return isDark ? 'bg-indigo-950/40 text-indigo-300 border-indigo-500/50' : 'bg-indigo-50 text-indigo-600 border-indigo-300';
+            case 'pelican':
+              return isDark ? 'bg-amber-950/40 text-amber-300 border-amber-500/50' : 'bg-amber-50 text-amber-600 border-amber-300';
+            case 'image_gen':
+              return isDark ? 'bg-pink-950/40 text-pink-300 border-pink-500/50' : 'bg-pink-50 text-pink-600 border-pink-300';
+            case 'image_edit':
+              return isDark ? 'bg-rose-950/40 text-rose-300 border-rose-500/50' : 'bg-rose-50 text-rose-600 border-rose-300';
+            default:
+              return isDark ? 'bg-indigo-950/40 text-indigo-300 border-indigo-500/50' : 'bg-indigo-50 text-indigo-600 border-indigo-300';
+          }
+        };
+
+        // 维度单元格提示文案
+        const getDimCellTitle = (res, key) => {
+          const d = res?.[key];
+          if (!d) return '';
+          const title = getDimTitle(key);
+          const detail = d.detail || d.error || (d.supported ? '检测通过' : '未支持');
+          const lat = dimLatencyText(res, key);
+          const actionText = key === 'pelican' && d.htmlCode ? '• 点击进入鹈鹕 SVG 动画沙箱渲染' : '• 点击查看完整请求与返回报文详情';
+          return `[${title}] ${detail}${lat ? ' (' + lat + ')' : ''}\n${actionText}\n• 悬停点击角标 ↻ 可单项重测 (重跑)`;
         };
 
         // 表格中模型行左侧状态指示灯：全部未检测时显示中性灰色
@@ -6008,9 +6316,12 @@
               }
               tasks.push(async () => {
                 run.status[key] = 'testing';
+                const dimTag = `${modelId}:${key}`;
+                activeTestingDims[dimTag] = true;
                 try {
                   await IMAGE_DIM_RUNNERS[key](modelId, result, ctx, run);
                 } finally {
+                  delete activeTestingDims[dimTag];
                   if (run.status[key] === 'testing') run.status[key] = 'fail';
                   // 实时判定该模型所有生图/编辑任务是否已完成，完成后立即移动到最前面 (上新下旧)
                   const isDone = IMAGE_DIM_ORDER.every(k => run.status[k] !== 'pending' && run.status[k] !== 'testing');
@@ -6127,9 +6438,12 @@
               }
               tasks.push(async () => {
                 run.status[key] = 'testing';
+                const dimTag = `${modelId}:${key}`;
+                activeTestingDims[dimTag] = true;
                 try {
                   await DIM_RUNNERS[key](modelId, result, ctx, run);
                 } finally {
+                  delete activeTestingDims[dimTag];
                   if (run.status[key] === 'testing') run.status[key] = 'fail';
                   // 实时判定该模型所有任务是否已完成，完成后立即移动到最前面 (上新下旧)
                   const isDone = DIM_ORDER.every(k => run.status[k] !== 'pending' && run.status[k] !== 'testing');
@@ -6181,10 +6495,10 @@
 
         // 立即检测单个指定模型（同样使用并发池，5 个维度可并行）
         const testSingleDirect = async (modelId) => {
-          if (!modelId || isTesting.value) return;
-          isTesting.value = true;
+          if (!modelId || isModelRunning(modelId)) return;
           testingModelId.value = modelId;
           batchStopRequested.value = false;
+          isTesting.value = true;
           try {
             if (testMode.value === 'image') {
               await runImageModels([modelId]);
@@ -6201,16 +6515,17 @@
 
         // 单项重新检测：精准针对单个模型的单一维度执行重新检测，不覆盖其他已有维度结果
         const testSingleDimension = async (modelId, dimKey) => {
-          if (!modelId || isTesting.value) return;
-          isTesting.value = true;
+          if (!modelId || !dimKey || isDimRunning(modelId, dimKey)) return;
+          const dimTag = `${modelId}:${dimKey}`;
+          activeTestingDims[dimTag] = true;
           testingModelId.value = modelId;
           batchStopRequested.value = false;
 
           const isImageMode = IMAGE_DIM_ORDER.includes(dimKey);
           const runner = isImageMode ? IMAGE_DIM_RUNNERS[dimKey] : DIM_RUNNERS[dimKey];
           if (!runner) {
-            isTesting.value = false;
-            testingModelId.value = '';
+            delete activeTestingDims[dimTag];
+            if (Object.keys(activeTestingDims).length === 0) testingModelId.value = '';
             return;
           }
 
@@ -6244,9 +6559,6 @@
               },
               startedAt: performance.now()
             };
-            liveRuns.value = [run];
-            totalTaskCount.value = 1;
-            finishedTaskCount.value = 0;
 
             run.status[dimKey] = 'testing';
             try {
@@ -6257,7 +6569,8 @@
               showToast(`检测出错: ${e.message}`, 'error');
             } finally {
               if (run.status[dimKey] === 'testing') run.status[dimKey] = 'fail';
-              finishedTaskCount.value = 1;
+              delete activeTestingDims[dimTag];
+              if (Object.keys(activeTestingDims).length === 0) testingModelId.value = '';
               result.totalLatency = (result.image_gen?.latency || 0) + (result.image_edit?.latency || 0);
               result.timestamp = new Date().toLocaleTimeString();
               // 最新检测结果移动到最前面，上新下旧
@@ -6267,9 +6580,6 @@
               }
               imageTestResults.value.unshift(result);
               saveImageResultsToStorage();
-              isTesting.value = false;
-              testingModelId.value = '';
-              liveRuns.value = [];
             }
           } else {
             let result = testResults.value.find(r => r.model === modelId);
@@ -6294,9 +6604,6 @@
             DIM_ORDER.forEach(k => {
               run.status[k] = k === dimKey ? 'pending' : (isDimUntested(result, k) ? 'skipped' : (result[k]?.supported ? 'pass' : 'fail'));
             });
-            liveRuns.value = [run];
-            totalTaskCount.value = 1;
-            finishedTaskCount.value = 0;
 
             run.status[dimKey] = 'testing';
             try {
@@ -6307,7 +6614,8 @@
               showToast(`检测出错: ${e.message}`, 'error');
             } finally {
               if (run.status[dimKey] === 'testing') run.status[dimKey] = 'fail';
-              finishedTaskCount.value = 1;
+              delete activeTestingDims[dimTag];
+              if (Object.keys(activeTestingDims).length === 0) testingModelId.value = '';
               result.totalLatency = DIM_ORDER.reduce((acc, k) => acc + (result[k]?.latency || 0), 0);
               result.timestamp = new Date().toLocaleTimeString();
               // 最新检测结果移动到最前面，上新下旧
@@ -6317,9 +6625,6 @@
               }
               testResults.value.unshift(result);
               saveChatResultsToStorage();
-              isTesting.value = false;
-              testingModelId.value = '';
-              liveRuns.value = [];
             }
           }
         };
@@ -6331,9 +6636,10 @@
             showToast('请至少勾选一个待检测模型', 'error');
             return;
           }
-          if (isTesting.value) return;
+          if (isBatchTesting.value) return;
 
           isTesting.value = true;
+          isBatchTesting.value = true;
           batchStopRequested.value = false;
 
           try {
@@ -6352,6 +6658,7 @@
             }
           } finally {
             isTesting.value = false;
+            isBatchTesting.value = false;
             testingModelId.value = '';
             liveRuns.value = [];
           }
@@ -7135,6 +7442,10 @@
           lastFetchTime,
           filteredModels,
           isTesting,
+          isBatchTesting,
+          activeTestingDims,
+          isDimRunning,
+          isModelRunning,
           testingModelId,
           liveRuns,
           liveDims: currentLiveDims,
@@ -7179,6 +7490,9 @@
           dimLatencyText,
           dimBadgeClass,
           cardDimClass,
+          untestedBadgeClass,
+          runningBadgeClass,
+          getDimCellTitle,
           formatDuration,
           liveInspectorAvailable,
           openLiveInspector,
