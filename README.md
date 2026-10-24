@@ -1,16 +1,48 @@
 # ModelInspector - 纯前端单页面 AI 模型能力检测平台
 
-OpenAI 兼容接口模型能力检测工具，**100% 纯前端浏览器直接运行（纯静态单页面应用）**，已完全本地化所有静态依赖（JS/CSS/字体/图标全部离线可用，无需担心 CDN 失效或网络受限），无需任何后端服务（无需 Node.js / Python / 任何构建与编译），直接在浏览器双击打开 [`index.html`](file:///D:/dev/web_projects/model_check/index.html) 即可使用。
+OpenAI 兼容接口模型能力检测工具，**100% 纯前端浏览器直接运行（纯静态单页面应用）**，已完全本地化所有静态依赖（JS/CSS/字体/图标全部离线可用，无需担心 CDN 失效或网络受限），无需任何后端服务（无需 Node.js / Python / 任何构建与编译），直接在浏览器双击打开 [`index.html`](file:///D:/work/web_projects/model_check/index.html) 即可使用。
 
 ---
 
 ## ⚡ 核心能力与升级特性
 
-1. **📦 静态资源完全本地化 (100% Offline-Ready)**：
+1. **🎨 对话检测 / 图片生成 / 图片编辑 双模式自由切换**：
+   - **默认模式**：保持原有的「💬 对话 / 多模态模型检测」（涵盖基础连通、深度思考链、视觉多模态真值校验、原生工具调用、鹈鹕单车 SVG 动画基准）。
+   - **一键切换**：点击顶部导航栏或横幅的「🎨 图片生成 / 编辑检测」即可无缝切换为图像专项检测模式。
+   - **生图参数可在页面按需配置（极简默认，兼容所有大模型与中转接口）**：
+     - **提示词 (Prompt)**：默认预设 `一只戴着复古墨镜在赛博朋克霓虹街头滑板的柴犬，电影级光影，8k高分辨率壁纸`（支持自定义与一键重置）。
+     - **极简传参默认**：默认**仅传递必需的 `model` 与 `prompt`**，自动省去非常用参数（如 `quality`、`style`、`response_format`、`n` 以及严禁污染生图接口的 `max_tokens`），杜绝因非 DALL-E 3 模型不支持 `quality` 或 `style` 而抛出 `quality is not supported by text image queue` 等报错。
+     - **按需扩展参数**：
+       - **图片尺寸 (Size)**：默认不传（使用模型缺省尺寸）；可选 `1024x1024`、`512x512`、`768x768`、`1792x1024`、`1024x1792`、`1536x1024`、`1024x1536`。
+       - **画质 (Quality)**：默认不传（兼容所有模型）；专为 DALL-E 3 可选 `standard` 与 `hd`。
+       - **风格 (Style)**：默认不传（兼容所有模型）；专为 DALL-E 3 可选 `vivid` 与 `natural`。
+       - **返回格式 (Response Format)**：默认不传（自适应服务端返回的 URL 或 Base64）；可选显式指定 `url` 或 `b64_json`。
+       - **生成张数 (N)**：默认 1 张（不传参，仅在设为大于 1 时向接口传递）。
+   - **图片编辑精简传参与自定义换图**：
+     - **极简 FormData**：默认仅向 `/images/edits` 传递 `model`、`prompt` 与 `image` 二进制文件，不额外附加 `n`、`size`、`response_format` 等非常用字段，最大程度保障中转网关兼容性。
+     - **默认底图**：默认加载 [`image/example.jpg`](file:///D:/work/web_projects/model_check/image/example.jpg) 并提供高保真预览与点击放大。
+     - **离线安全增强**：内置 `js/default_example_image.js` Base64 兜底机制，即使在 Chromium 最严苛的 `file:///` 本地文件安全策略下也能 100% 稳定生成编辑所需的二进制 Blob 文件。
+     - **自定义换图**：支持直接上传本地任意图片作为编辑底图，并提供一键重置回默认底图。
+     - **编辑提示词**：默认 `把背景中的植物全部换成盛开的向日葵花海，风格自然`（支持自定义与一键重置）。
+   - **超时阈值动态自适应**：
+     - 对话检测模式默认请求超时阈值为 **60 秒**。
+     - 图片生成与编辑模式因扩散模型与文生图排队较长，默认请求超时阈值自动设为 **120 秒**（支持在页面 5 ~ 600 秒自由调节并持久化记忆）。
+   - **专属生图/编辑结果展示与全屏灯箱 (Lightbox)**：
+     - 支持表格视图与卡片视图自由切换。
+     - 缩略图清晰展示原图与生成/编辑效果，点击可触发全屏沉浸式图片灯箱，支持大图放大查看、Prompt 对比与在线图片新标签页打开。
+     - 支持通信报文抓包审计，完整还原 `/images/generations` 与 `/images/edits` (multipart/form-data) 请求和响应。
+   - **检测结果浏览器本地持久化 (刷新不丢失，双模式数据隔离)**：
+     - **持久化保存**：检测完成后的结果会自动实时保存至浏览器 LocalStorage，刷新页面依然完整保留。
+     - **严格隔离**：对话模型检测结果与图片生图/编辑结果完全隔离存储，切换或刷新时绝不混淆或误展示。
+     - **完整展示所有检测项**：表格与卡片始终完整展示所有评测维度，跳过或未参与检测的维度统一显式标明「未检测」。
+     - **单项重新检测**：
+       - 表格每行右侧操作栏提供清晰的「↻ 重测」按钮，支持对单个模型重新检测所有当前选中的项目；
+       - 未检测维度药丸胶囊支持点击直接发起该单一维度的精准检测与增量更新，不覆盖该模型其他已通过的维度数据。
+2. **📦 静态资源完全本地化 (100% Offline-Ready)**：
    - 使用 `image/favicon.png` 作为网站标准 Favicon 与导航栏品牌图标。
    - 所有依赖的 JS 库（`Tailwind CSS`、`Vue 3`、`Canvas Confetti`）已全部下载至本地 `js/` 目录。
    - 依赖的英文字体（`Plus Jakarta Sans` 与 `JetBrains Mono`）及 WOFF2 字体包已全部本地化至 `fonts/` 与 `css/fonts.css`，彻底解除对外部 Google Fonts 与公共 CDN 的依赖。
-2. **🧠 思考输出解析与展示 (Reasoning / Thinking)**：
+3. **🧠 思考输出解析与展示 (Reasoning / Thinking)**：
    - 全面兼容支持推理模型（如 DeepSeek-R1、OpenAI o1/o3-mini 系列、Claude 3.7 Sonnet 思考模式等）。
    - 请求体始终显式携带 `stream` 字段，默认 `false`；可在左栏开启「流式返回」，开启后为 `stream: true` 并按 SSE 增量还原完整思考链。
    - 请求显式携带 `reasoning_effort`（左栏可选择 high / medium / low，默认 **high**）。
@@ -53,14 +85,16 @@ model_check/
 ├── index.html        # 核心主页面（零后台、纯静态直接双击运行）
 ├── README.md         # 项目说明文档
 ├── image/
-│   └── favicon.png   # 站点 Favicon 与 Logo 图标
+│   ├── favicon.png   # 站点 Favicon 与 Logo 图标
+│   └── example.jpg   # 图片编辑基准测试默认底图
 ├── css/
 │   └── fonts.css     # 本地字体样式定义
 ├── fonts/            # 本地 WOFF2 字体文件库（无需外网加载 Google Fonts）
 └── js/               # 本地第三方依赖库
-    ├── tailwindcss.js          # Tailwind CSS 浏览器运行时
-    ├── vue.global.prod.min.js   # Vue 3 核心生产构建
-    └── confetti.browser.min.js  # 庆祝礼花动效
+    ├── tailwindcss.js           # Tailwind CSS 浏览器运行时
+    ├── vue.global.prod.min.js    # Vue 3 核心生产构建
+    ├── confetti.browser.min.js   # 庆祝礼花动效
+    └── default_example_image.js  # example.jpg 离线 Base64 安全加载兜底
 ```
 
 ---

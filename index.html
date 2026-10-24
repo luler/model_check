@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ModelInspector - 纯前端单页面 AI 模型能力检测平台 (思考/鹈鹕单车/视觉/工具/对话)</title>
+  <title>ModelInspector - 纯前端单页面 AI 模型能力检测平台 (对话/思考/视觉/工具/鹈鹕/生图/编辑)</title>
   
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="image/favicon.png">
@@ -17,6 +17,7 @@
   <script src="js/tailwindcss.js"></script>
   <script src="js/vue.global.prod.min.js"></script>
   <script src="js/confetti.browser.min.js"></script>
+  <script src="js/default_example_image.js"></script>
 
   <script>
     tailwind.config = {
@@ -167,9 +168,32 @@
               </span>
             </div>
             <p class="text-xs transition-colors hidden xl:block truncate" :class="isDarkMode ? 'text-slate-400' : 'text-slate-500'">
-              纯前端单页架构 · 深度思考输出 · 鹈鹕骑单车SVG动画实时沙箱 · 真实图像比对 · 原生 tool_calls 解析
+              纯前端单页架构 · 深度思考输出 · 鹈鹕骑单车SVG沙箱 · 图像生成/编辑多模态 · 原生 tool_calls 解析
             </p>
           </div>
+        </div>
+
+        <!-- Header Mode Switcher: Chat vs Image Generation & Edit -->
+        <div class="hidden lg:flex items-center p-1 rounded-xl border transition-colors shadow-inner flex-shrink-0"
+             :class="isDarkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'">
+          <button @click="testMode = 'chat'" 
+                  class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center space-x-1.5"
+                  :class="testMode === 'chat' ? (isDarkMode ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'bg-white text-indigo-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')">
+            <span>💬 对话模型检测</span>
+            <span v-if="testResults.length > 0" class="text-[10px] px-1.5 py-0.2 rounded-full font-mono"
+                  :class="testMode === 'chat' ? (isDarkMode ? 'bg-indigo-700/60 text-indigo-100' : 'bg-indigo-100 text-indigo-800') : (isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-200 text-slate-600')">
+              {{ testResults.length }}
+            </span>
+          </button>
+          <button @click="testMode = 'image'" 
+                  class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center space-x-1.5"
+                  :class="testMode === 'image' ? (isDarkMode ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-md shadow-pink-600/30' : 'bg-white text-pink-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')">
+            <span>🎨 图片生成 / 编辑检测</span>
+            <span v-if="imageTestResults.length > 0" class="text-[10px] px-1.5 py-0.2 rounded-full font-mono"
+                  :class="testMode === 'image' ? (isDarkMode ? 'bg-pink-700/60 text-pink-100' : 'bg-pink-100 text-pink-800') : (isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-200 text-slate-600')">
+              {{ imageTestResults.length }}
+            </span>
+          </button>
         </div>
 
         <!-- Top Right Navigation Actions -->
@@ -358,7 +382,9 @@
               <div v-show="showAdvanced" class="mt-3 space-y-3 text-xs p-3.5 rounded-xl border transition-colors"
                    :class="isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-100 border-slate-200'">
                 
-                <!-- Detection Checkboxes -->
+                <!-- CHAT MODE DETECTION & ADVANCED SETTINGS -->
+                <div v-if="testMode === 'chat'" class="space-y-3">
+                  <!-- Detection Checkboxes -->
                 <div>
                   <div class="font-medium mb-1.5 flex items-center justify-between" :class="isDarkMode ? 'text-slate-200' : 'text-slate-800'">
                     <span>检测维度控制:</span>
@@ -400,25 +426,7 @@
                             placeholder="生成一个svg动画：鹈鹕骑自行车，用H5给我展示下"></textarea>
                 </div>
 
-                <!-- CORS Proxy Toggle for pure browser CORS issues -->
-                <div class="pt-2 border-t" :class="isDarkMode ? 'border-slate-800' : 'border-slate-200'">
-                  <div class="flex items-center justify-between">
-                    <div>
-                      <div class="font-medium" :class="isDarkMode ? 'text-slate-200' : 'text-slate-800'">公共跨域代理 (可选)</div>
-                      <div class="text-[10px]" :class="isDarkMode ? 'text-slate-500' : 'text-slate-500'">仅在官方 api.openai.com 报 CORS 错误时开启</div>
-                    </div>
-                    <input type="checkbox" v-model="useCorsProxy" class="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4">
-                  </div>
-
-                  <div v-if="useCorsProxy" class="pt-2">
-                    <input v-model="corsProxyUrl" type="text"
-                           placeholder="https://corsproxy.io/?url="
-                           class="w-full px-2.5 py-1.5 text-xs font-mono rounded-lg border focus:outline-none"
-                           :class="isDarkMode ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-300 text-slate-800'">
-                  </div>
-                </div>
-
-                <!-- Thinking Effort (reasoning_effort) -->
+                  <!-- Thinking Effort (reasoning_effort) -->
                 <div class="pt-2 border-t" :class="isDarkMode ? 'border-slate-800' : 'border-slate-200'">
                   <div class="flex items-center justify-between gap-2">
                     <span class="whitespace-nowrap flex-shrink-0" :class="isDarkMode ? 'text-slate-300' : 'text-slate-700'">思考强度:</span>
@@ -492,6 +500,226 @@
                     </button>
                   </div>
                 </div>
+                </div>
+
+                <!-- IMAGE MODE DETECTION & PARAMETER SETTINGS -->
+                <div v-else class="space-y-3.5">
+                  <!-- Image Dimensions Selection -->
+                  <div>
+                    <div class="font-medium mb-1.5 flex items-center justify-between" :class="isDarkMode ? 'text-slate-200' : 'text-slate-800'">
+                      <span>图片检测维度:</span>
+                      <span class="text-[10px] text-pink-400 font-mono">已选 {{ (checkImageGen?1:0)+(checkImageEdit?1:0) }}/2 项</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2" :class="isDarkMode ? 'text-slate-300' : 'text-slate-700'">
+                      <label class="flex items-center space-x-2 cursor-pointer p-2 rounded-lg border transition"
+                             :class="checkImageGen ? (isDarkMode ? 'bg-pink-950/20 border-pink-500/40 text-pink-300' : 'bg-pink-50 border-pink-200 text-pink-900') : (isDarkMode ? 'bg-slate-950/40 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-600')">
+                        <input type="checkbox" v-model="checkImageGen" class="rounded text-pink-600 h-3.5 w-3.5">
+                        <span class="font-bold text-xs truncate">🎨 图片生成 (Generations)</span>
+                      </label>
+                      <label class="flex items-center space-x-2 cursor-pointer p-2 rounded-lg border transition"
+                             :class="checkImageEdit ? (isDarkMode ? 'bg-rose-950/20 border-rose-500/40 text-rose-300' : 'bg-rose-50 border-rose-200 text-rose-900') : (isDarkMode ? 'bg-slate-950/40 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-600')">
+                        <input type="checkbox" v-model="checkImageEdit" class="rounded text-rose-600 h-3.5 w-3.5">
+                        <span class="font-bold text-xs truncate">✏️ 图片编辑 (Edits)</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- 🎨 Image Generation Parameters -->
+                  <div v-if="checkImageGen" class="pt-2 border-t space-y-2.5" :class="isDarkMode ? 'border-slate-800' : 'border-slate-200'">
+                    <div class="flex items-center justify-between">
+                      <span class="font-bold text-pink-400 flex items-center space-x-1">
+                        <span>🎨</span>
+                        <span>生图基本参数 (支持设置与默认值)</span>
+                      </span>
+                      <button @click="resetImageGenParams" class="text-[10px] text-slate-400 hover:text-pink-400 transition underline">
+                        恢复默认
+                      </button>
+                    </div>
+
+                    <!-- Prompt -->
+                    <div class="space-y-1">
+                      <div class="flex items-center justify-between text-[11px]" :class="isDarkMode ? 'text-slate-400' : 'text-slate-600'">
+                        <span>生图提示词 (Prompt):</span>
+                        <span class="font-mono text-[10px] opacity-75">{{ imageGenPrompt.length }} 字</span>
+                      </div>
+                      <textarea v-model="imageGenPrompt" rows="2"
+                                class="w-full px-2.5 py-1.5 text-xs rounded-lg border font-mono resize-none focus:outline-none focus:ring-1 focus:ring-pink-500/50"
+                                :class="isDarkMode ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-300 text-slate-800'"
+                                placeholder="输入生图提示词..."></textarea>
+                    </div>
+
+                    <!-- Size (Core Parameter) -->
+                    <div class="text-[11px]">
+                      <div class="flex items-center justify-between mb-1">
+                        <span class="text-slate-400">尺寸 (Size):</span>
+                        <span class="text-[10px] font-mono text-pink-400">{{ imageGenSize || '默认自适应' }}</span>
+                      </div>
+                      <select v-model="imageGenSize"
+                              class="w-full px-2 py-1.5 text-xs rounded-lg border font-mono focus:outline-none"
+                              :class="isDarkMode ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-300 text-slate-800'">
+                        <option value="">不传（默认 · 推荐兼容）</option>
+                        <option value="1024x1024">1024x1024 (正方形 1:1)</option>
+                        <option value="512x512">512x512 (标准 1:1)</option>
+                        <option value="768x768">768x768 (中等 1:1)</option>
+                        <option value="1024x1792">1024x1792 (竖屏 9:16)</option>
+                        <option value="1792x1024">1792x1024 (横屏 16:9)</option>
+                      </select>
+                    </div>
+
+                    <!-- Advanced Optional Parameters (Collapsed by default) -->
+                    <details class="text-[11px] pt-1">
+                      <summary class="cursor-pointer text-slate-400 hover:text-pink-400 select-none transition py-0.5 flex items-center space-x-1">
+                        <span>⚙️ 展开更多可选参数 (Quality / Style / Format / N)</span>
+                      </summary>
+                      <div class="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-800/50">
+                        <div>
+                          <span class="block mb-1 text-slate-400">画质 (Quality):</span>
+                          <select v-model="imageGenQuality"
+                                  class="w-full px-2 py-1 text-xs rounded border font-mono focus:outline-none"
+                                  :class="isDarkMode ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-300 text-slate-800'">
+                            <option value="">不传（默认）</option>
+                            <option value="standard">standard</option>
+                            <option value="hd">hd (DALL-E 3)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <span class="block mb-1 text-slate-400">风格 (Style):</span>
+                          <select v-model="imageGenStyle"
+                                  class="w-full px-2 py-1 text-xs rounded border font-mono focus:outline-none"
+                                  :class="isDarkMode ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-300 text-slate-800'">
+                            <option value="">不传（默认）</option>
+                            <option value="vivid">vivid</option>
+                            <option value="natural">natural</option>
+                          </select>
+                        </div>
+                        <div>
+                          <span class="block mb-1 text-slate-400">格式 (Format):</span>
+                          <select v-model="imageGenResponseFormat"
+                                  class="w-full px-2 py-1 text-xs rounded border font-mono focus:outline-none"
+                                  :class="isDarkMode ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-300 text-slate-800'">
+                            <option value="">不传（自动适配）</option>
+                            <option value="url">url</option>
+                            <option value="b64_json">b64_json</option>
+                          </select>
+                        </div>
+                        <div>
+                          <span class="block mb-1 text-slate-400">张数 (N):</span>
+                          <select v-model="imageGenN"
+                                  class="w-full px-2 py-1 text-xs rounded border font-mono focus:outline-none"
+                                  :class="isDarkMode ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-300 text-slate-800'">
+                            <option :value="1">1 张（默认）</option>
+                            <option :value="2">2 张</option>
+                          </select>
+                        </div>
+                      </div>
+                    </details>
+                  </div>
+
+                  <!-- ✏️ Image Editing Parameters -->
+                  <div v-if="checkImageEdit" class="pt-2 border-t space-y-2.5" :class="isDarkMode ? 'border-slate-800' : 'border-slate-200'">
+                    <div class="flex items-center justify-between">
+                      <span class="font-bold text-rose-400 flex items-center space-x-1">
+                        <span>✏️</span>
+                        <span>编辑图片参数 (默认编辑 image/example.jpg)</span>
+                      </span>
+                      <button @click="resetImageEditParams" class="text-[10px] text-slate-400 hover:text-rose-400 transition underline">
+                        恢复默认
+                      </button>
+                    </div>
+
+                    <!-- Base image widget inside panel -->
+                    <div class="p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-colors"
+                         :class="isDarkMode ? 'bg-slate-950/70 border-slate-800' : 'bg-white border-slate-200'">
+                      <div class="flex items-center space-x-2.5 min-w-0">
+                        <img :src="customEditImagePreview || 'image/example.jpg'" 
+                             class="w-12 h-12 rounded-lg object-cover border flex-shrink-0 cursor-pointer shadow-sm hover:scale-105 transition"
+                             :class="isDarkMode ? 'border-slate-700' : 'border-slate-300'"
+                             @click="openLightbox(customEditImagePreview || 'image/example.jpg', '编辑参考底图', customEditImageName || 'image/example.jpg (默认)')"
+                             title="点击放大查看原图" />
+                        <div class="min-w-0">
+                          <div class="font-bold text-xs truncate" :class="isDarkMode ? 'text-slate-200' : 'text-slate-800'">
+                            {{ customEditImageName || 'image/example.jpg' }}
+                          </div>
+                          <div class="text-[10px] text-emerald-500 font-mono truncate">
+                            {{ customEditImageBlob ? '自定义已选底图' : '默认编辑底图 · 48.5KB' }}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="flex items-center space-x-1.5 flex-shrink-0">
+                        <label class="px-2.5 py-1 text-[11px] rounded border cursor-pointer transition font-medium whitespace-nowrap"
+                               :class="isDarkMode ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700'">
+                          <span>更换原图</span>
+                          <input type="file" accept="image/*" @change="onEditImageUpload" class="hidden">
+                        </label>
+                        <button v-if="customEditImageBlob" @click="resetToDefaultExampleImage" 
+                                class="px-2 py-1 text-[11px] rounded border transition text-amber-400 border-amber-500/30 hover:bg-amber-500/10 whitespace-nowrap">
+                          恢复默认
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Edit Prompt -->
+                    <div class="space-y-1">
+                      <div class="flex items-center justify-between text-[11px]" :class="isDarkMode ? 'text-slate-400' : 'text-slate-600'">
+                        <span>编辑提示词 (Prompt):</span>
+                        <span class="font-mono text-[10px] opacity-75">{{ imageEditPrompt.length }} 字</span>
+                      </div>
+                      <textarea v-model="imageEditPrompt" rows="2"
+                                class="w-full px-2.5 py-1.5 text-xs rounded-lg border font-mono resize-none focus:outline-none focus:ring-1 focus:ring-rose-500/50"
+                                :class="isDarkMode ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-300 text-slate-800'"
+                                placeholder="输入图片编辑需求..."></textarea>
+                    </div>
+
+                    <!-- Optional Edit Size & Format (Collapsed) -->
+                    <details class="text-[11px] pt-1">
+                      <summary class="cursor-pointer text-slate-400 hover:text-rose-400 select-none transition py-0.5 flex items-center space-x-1">
+                        <span>⚙️ 可选参数 (Size / Format)</span>
+                      </summary>
+                      <div class="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-800/50">
+                        <div>
+                          <span class="block mb-1 text-slate-400">尺寸 (Size):</span>
+                          <select v-model="imageEditSize"
+                                  class="w-full px-2 py-1 text-xs rounded border font-mono focus:outline-none"
+                                  :class="isDarkMode ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-300 text-slate-800'">
+                            <option value="">不传（默认底图尺寸）</option>
+                            <option value="1024x1024">1024x1024</option>
+                            <option value="512x512">512x512</option>
+                          </select>
+                        </div>
+                        <div>
+                          <span class="block mb-1 text-slate-400">格式 (Format):</span>
+                          <select v-model="imageEditResponseFormat"
+                                  class="w-full px-2 py-1 text-xs rounded border font-mono focus:outline-none"
+                                  :class="isDarkMode ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-300 text-slate-800'">
+                            <option value="">不传（自动解析）</option>
+                            <option value="url">url</option>
+                            <option value="b64_json">b64_json</option>
+                          </select>
+                        </div>
+                      </div>
+                    </details>
+                  </div>
+                </div>
+
+                <!-- SHARED OPTIONS: CORS PROXY -->
+                <!-- CORS Proxy Toggle for pure browser CORS issues -->
+                <div class="pt-2 border-t" :class="isDarkMode ? 'border-slate-800' : 'border-slate-200'">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="font-medium" :class="isDarkMode ? 'text-slate-200' : 'text-slate-800'">公共跨域代理 (可选)</div>
+                      <div class="text-[10px]" :class="isDarkMode ? 'text-slate-500' : 'text-slate-500'">仅在官方 api.openai.com 报 CORS 错误时开启</div>
+                    </div>
+                    <input type="checkbox" v-model="useCorsProxy" class="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4">
+                  </div>
+
+                  <div v-if="useCorsProxy" class="pt-2">
+                    <input v-model="corsProxyUrl" type="text"
+                           placeholder="https://corsproxy.io/?url="
+                           class="w-full px-2.5 py-1.5 text-xs font-mono rounded-lg border focus:outline-none"
+                           :class="isDarkMode ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-300 text-slate-800'">
+                  </div>
+                </div>
 
                 <!-- Concurrency -->
                 <div class="pt-2 border-t" :class="isDarkMode ? 'border-slate-800' : 'border-slate-200'">
@@ -511,9 +739,16 @@
 
                 <!-- Timeout setting -->
                 <div class="flex items-center justify-between pt-2 border-t" :class="isDarkMode ? 'border-slate-800' : 'border-slate-200'">
-                  <span :class="isDarkMode ? 'text-slate-300' : 'text-slate-700'">请求超时阈值:</span>
+                  <div>
+                    <span :class="isDarkMode ? 'text-slate-300' : 'text-slate-700'">请求超时阈值:</span>
+                    <span v-if="testMode === 'image'" class="text-[10px] text-pink-400 font-mono ml-1.5">(默认 120s)</span>
+                    <span v-else class="text-[10px] text-indigo-400 font-mono ml-1.5">(默认 60s)</span>
+                  </div>
                   <div class="flex items-center space-x-1">
-                    <input v-model.number="timeoutSeconds" type="number" min="5" max="300" 
+                    <input v-if="testMode === 'image'" v-model.number="imageTimeoutSeconds" type="number" min="5" max="600" 
+                           class="w-14 px-2 py-1 text-xs rounded border text-right font-mono"
+                           :class="isDarkMode ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-300 text-slate-800'">
+                    <input v-else v-model.number="timeoutSeconds" type="number" min="5" max="300" 
                            class="w-14 px-2 py-1 text-xs rounded border text-right font-mono"
                            :class="isDarkMode ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-300 text-slate-800'">
                     <span class="text-slate-500">秒</span>
@@ -567,7 +802,7 @@
 
               <!-- Quick Tag Filter Pills -->
               <div class="flex flex-wrap gap-1 text-[11px]">
-                <button v-for="tag in quickTags" :key="tag" @click="filterByTag(tag)"
+                <button v-for="tag in currentQuickTags" :key="tag" @click="filterByTag(tag)"
                         class="px-2 py-0.5 rounded-md transition font-mono"
                         :class="activeTag === tag ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 font-semibold' : (isDarkMode ? 'bg-slate-800/60 text-slate-400 hover:text-slate-200' : 'bg-slate-100 text-slate-600 hover:text-slate-900')">
                   {{ tag }}
@@ -650,7 +885,7 @@
                 <svg v-if="isTesting" class="w-4 h-4 animate-spin text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 <span class="text-sm">
-                  {{ isTesting ? `正在检测 (${concurrency} 并发 · ${finishedTaskCount}/${totalTaskCount} 请求)...` : (selectedModels.length === 0 ? '请勾选待检测模型' : `点击开始检测已选模型 (${selectedModels.length} 个)`) }}
+                  {{ isTesting ? (batchStopRequested ? '正在中止中...' : `正在检测 (${concurrency} 并发 · ${finishedTaskCount}/${totalTaskCount} 任务)...`) : (selectedModels.length === 0 ? '请勾选待测模型' : (testMode === 'image' ? `开始生图/编辑检测已选模型 (${selectedModels.length} 个)` : `开始检测已选模型 (${selectedModels.length} 个)`)) }}
                 </span>
               </button>
             </div>
@@ -671,6 +906,8 @@
 
           </div>
 
+          <!-- Chat Mode Bottom Widgets -->
+        <div v-if="testMode === 'chat'" class="space-y-4">
           <!-- Test Image Preview Widget -->
           <div class="rounded-2xl p-4 shadow-lg flex items-center justify-between transition-colors"
                :class="isDarkMode ? 'glass-dark' : 'glass-light'">
@@ -707,17 +944,19 @@
               <span>🎨 打开渲染</span>
             </button>
           </div>
-
         </div>
+
+        </div> <!-- ================= END LEFT COLUMN (4 cols) ================= -->
 
         <!-- ================= RIGHT COLUMN: Results & Inspection Matrix (8 cols) ================= -->
         <div class="lg:col-span-8 xl:col-span-8 space-y-6">
-          
+
           <!-- Summary Header Bar -->
           <div class="rounded-2xl p-4 shadow-xl flex flex-wrap items-center justify-between gap-3 border transition-colors"
                :class="isDarkMode ? 'glass-dark border-slate-800' : 'glass-light border-slate-200'">
             
-            <div class="flex items-center space-x-3 sm:space-x-4 flex-wrap gap-y-2">
+            <!-- Chat Mode Stats Counters -->
+            <div v-if="testMode === 'chat'" class="flex items-center space-x-3 sm:space-x-4 flex-wrap gap-y-2">
               <div>
                 <div class="text-[11px] font-semibold uppercase tracking-wider" :class="isDarkMode ? 'text-slate-400' : 'text-slate-500'">
                   已检测
@@ -744,7 +983,7 @@
                   {{ countPelicanPass }}
                 </div>
               </div>
-              <div class="h-8 w-px" :class="isDarkMode ? 'bg-slate-800' : 'bg-slate-200'"></div>
+              <div v-if="checkPelican || countPelicanPass > 0" class="h-8 w-px" :class="isDarkMode ? 'bg-slate-800' : 'bg-slate-200'"></div>
               <div>
                 <div class="text-[11px] font-semibold uppercase tracking-wider text-emerald-500">
                   支持视觉
@@ -773,20 +1012,98 @@
               </div>
             </div>
 
-            <!-- View Switcher -->
-            <div class="flex items-center space-x-1 p-1 rounded-xl border transition-colors"
-                 :class="isDarkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'">
-              <button @click="viewMode = 'table'" 
-                      class="px-2.5 py-1 text-xs font-medium rounded-lg transition"
-                      :class="viewMode === 'table' ? 'bg-indigo-600 text-white shadow' : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')">
-                表格视图
+            <!-- Image Mode Stats Counters -->
+            <div v-else class="flex items-center space-x-3 sm:space-x-4 flex-wrap gap-y-2">
+              <div>
+                <div class="text-[11px] font-semibold uppercase tracking-wider" :class="isDarkMode ? 'text-slate-400' : 'text-slate-500'">
+                  已检测模型
+                </div>
+                <div class="text-xl font-extrabold font-mono" :class="isDarkMode ? 'text-slate-100' : 'text-slate-900'">
+                  {{ imageTestResults.length }}
+                </div>
+              </div>
+              <div class="h-8 w-px" :class="isDarkMode ? 'bg-slate-800' : 'bg-slate-200'"></div>
+              <div>
+                <div class="text-[11px] font-semibold uppercase tracking-wider text-pink-400">
+                  生图支持
+                </div>
+                <div class="text-xl font-extrabold font-mono text-pink-400">
+                  {{ countImageGenPass }}
+                </div>
+              </div>
+              <div class="h-8 w-px" :class="isDarkMode ? 'bg-slate-800' : 'bg-slate-200'"></div>
+              <div>
+                <div class="text-[11px] font-semibold uppercase tracking-wider text-rose-400">
+                  编辑支持
+                </div>
+                <div class="text-xl font-extrabold font-mono text-rose-400">
+                  {{ countImageEditPass }}
+                </div>
+              </div>
+              <div class="h-8 w-px" :class="isDarkMode ? 'bg-slate-800' : 'bg-slate-200'"></div>
+              <div>
+                <div class="text-[11px] font-semibold uppercase tracking-wider text-purple-400">
+                  双项全能
+                </div>
+                <div class="text-xl font-extrabold font-mono text-purple-400">
+                  {{ countImageDualPass }}
+                </div>
+              </div>
+              <div class="h-8 w-px" :class="isDarkMode ? 'bg-slate-800' : 'bg-slate-200'"></div>
+              <div>
+                <div class="text-[11px] font-semibold uppercase tracking-wider text-cyan-400">
+                  平均耗时
+                </div>
+                <div class="text-xl font-extrabold font-mono text-cyan-400">
+                  {{ avgImageLatency ? formatDuration(avgImageLatency) : '—' }}
+                </div>
+              </div>
+            </div>
+
+            <!-- View Switcher & Action Buttons -->
+            <div class="flex items-center space-x-2">
+              <div class="flex items-center space-x-1 p-1 rounded-xl border transition-colors"
+                   :class="isDarkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'">
+                <button @click="viewMode = 'table'" 
+                        class="px-2.5 py-1 text-xs font-medium rounded-lg transition"
+                        :class="viewMode === 'table' ? (testMode === 'image' ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow' : 'bg-indigo-600 text-white shadow') : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')">
+                  表格视图
+                </button>
+                <button @click="viewMode = 'cards'" 
+                        class="px-2.5 py-1 text-xs font-medium rounded-lg transition"
+                        :class="viewMode === 'cards' ? (testMode === 'image' ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow' : 'bg-indigo-600 text-white shadow') : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')">
+                  卡片视图
+                </button>
+              </div>
+
+              <!-- Quick Demo Data button when empty -->
+              <button v-if="(testMode === 'chat' ? testResults.length === 0 : imageTestResults.length === 0) && !isTesting"
+                      @click="loadDemoResults"
+                      class="px-2.5 py-1 text-xs font-medium rounded-xl border transition flex items-center space-x-1"
+                      :class="isDarkMode ? 'bg-slate-900 border-slate-800 text-indigo-400 hover:text-indigo-300 hover:border-indigo-500/30' : 'bg-slate-100 border-slate-200 text-indigo-600 hover:text-indigo-700'"
+                      title="载入示例数据以快速体验界面">
+                <span>💡 示例数据</span>
               </button>
-              <button @click="viewMode = 'cards'" 
-                      class="px-2.5 py-1 text-xs font-medium rounded-lg transition"
-                      :class="viewMode === 'cards' ? 'bg-indigo-600 text-white shadow' : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')">
-                卡片视图
+
+              <!-- Clear Results button -->
+              <button v-if="(testMode === 'chat' ? testResults.length > 0 : imageTestResults.length > 0)"
+                      @click="clearResults"
+                      class="px-2.5 py-1 text-xs font-medium rounded-xl border transition flex items-center space-x-1"
+                      :class="isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-red-400 hover:border-red-500/30' : 'bg-slate-100 border-slate-200 text-slate-600 hover:text-red-600 hover:border-red-200'"
+                      title="清空当前结果">
+                <span>清空</span>
+              </button>
+
+              <!-- Export Markdown button -->
+              <button v-if="(testMode === 'chat' ? testResults.length > 0 : imageTestResults.length > 0)"
+                      @click="exportMarkdown"
+                      class="px-2.5 py-1 text-xs font-medium rounded-xl border transition flex items-center space-x-1"
+                      :class="isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700' : 'bg-slate-100 border-slate-200 text-slate-700 hover:text-slate-900'"
+                      title="导出评测报告">
+                <span>导出</span>
               </button>
             </div>
+
           </div>
 
           <!-- Active Test Live Panel (Visible when testing) -->
@@ -828,7 +1145,7 @@
                   </div>
                   <div class="flex items-center space-x-2">
                     <span class="text-[11px] font-mono text-indigo-400">{{ liveRunSummary(run) }}</span>
-                    <button @click="openInspector(run.result, 'tools')"
+                    <button @click="openInspector(run.result, testMode === 'image' ? (run.result?.image_gen?.supported ? 'image_gen' : 'image_edit') : 'tools')"
                             class="px-2 py-0.5 rounded-md text-[10px] font-bold border transition"
                             :class="isDarkMode ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40 hover:bg-indigo-600/30' : 'bg-white text-indigo-700 border-indigo-300 hover:bg-indigo-50'">
                       查看报文
@@ -836,7 +1153,7 @@
                   </div>
                 </div>
 
-                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5 text-[11px] font-medium">
+                <div :class="testMode === 'image' ? 'grid grid-cols-2 gap-2 text-xs font-medium' : 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5 text-[11px] font-medium'">
                   <div v-for="dim in liveDims" :key="dim.key"
                        v-show="liveDimEnabled(dim.key)"
                        @click="openLiveInspector(run, dim.key)"
@@ -856,7 +1173,7 @@
           </div>
 
           <!-- Empty State (No tests yet) -->
-          <div v-if="testResults.length === 0 && !isTesting" 
+          <div v-if="(testMode === 'chat' ? testResults.length === 0 : imageTestResults.length === 0) && !isTesting" 
                class="rounded-2xl p-12 text-center border shadow-xl space-y-4 transition-colors"
                :class="isDarkMode ? 'glass-dark border-slate-800' : 'glass-light border-slate-200'">
             <div class="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-indigo-500 transition-colors"
@@ -864,9 +1181,11 @@
               <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </div>
             <div>
-              <h3 class="text-base font-bold" :class="isDarkMode ? 'text-slate-200' : 'text-slate-800'">等待开始检测</h3>
+              <h3 class="text-base font-bold" :class="isDarkMode ? 'text-slate-200' : 'text-slate-800'">
+                {{ testMode === 'image' ? '暂无图片模型检测结果' : '等待开始检测' }}
+              </h3>
               <p class="text-xs max-w-md mx-auto mt-1 leading-relaxed" :class="isDarkMode ? 'text-slate-400' : 'text-slate-500'">
-                每次刷新页面或点击刷新均会自动同步最新模型。在左侧勾选一个或多个模型，点击「开始检测已选模型」即可自动化实时判定视觉与工具调用支持情况。
+                {{ testMode === 'image' ? '在左侧勾选待检测模型，点击「开始图片生成/编辑检测」即可测试模型对生图与编辑接口的真实支持能力。' : '每次刷新页面或点击刷新均会自动同步最新模型。在左侧勾选一个或多个模型，点击「开始检测已选模型」即可自动化实时判定视觉与工具调用支持情况。' }}
               </p>
             </div>
             <div class="pt-2">
@@ -876,8 +1195,8 @@
             </div>
           </div>
 
-          <!-- TABLE VIEW -->
-          <div v-if="testResults.length > 0 && viewMode === 'table'" 
+          <!-- TABLE VIEW (CHAT) -->
+          <div v-if="testMode === 'chat' && testResults.length > 0 && viewMode === 'table'" 
                class="rounded-2xl shadow-xl overflow-hidden border transition-colors"
                :class="isDarkMode ? 'glass-dark border-slate-800' : 'glass-light border-slate-200'">
             <div class="overflow-x-auto">
@@ -885,14 +1204,14 @@
                 <thead>
                   <tr class="border-b transition-colors font-semibold tracking-wide"
                       :class="isDarkMode ? 'border-slate-800 bg-slate-900/80 text-slate-400' : 'border-slate-200 bg-slate-100/90 text-slate-600'">
-                    <th class="py-3 px-3 whitespace-nowrap w-[27%] min-w-[120px]">模型 (Model ID)</th>
-                    <th v-if="checkChat" class="py-3 px-2 text-center whitespace-nowrap">对话</th>
-                    <th v-if="checkThinking" class="py-3 px-2 text-center whitespace-nowrap text-purple-400">思考</th>
-                    <th v-if="checkVision" class="py-3 px-2 text-center whitespace-nowrap">视觉</th>
-                    <th v-if="checkTools" class="py-3 px-2 text-center whitespace-nowrap">工具</th>
-                    <th v-if="checkPelican" class="py-3 px-2 text-center whitespace-nowrap text-amber-400">鹈鹕</th>
-                    <th class="py-3 px-2 text-center whitespace-nowrap hidden xl:table-cell">延迟</th>
-                    <th class="py-3 px-2 text-right whitespace-nowrap w-[86px] xl:w-[118px]">操作</th>
+                    <th class="py-3 px-3 whitespace-nowrap w-[24%] min-w-[120px]">模型 (Model ID)</th>
+                    <th class="py-3 px-2 text-center whitespace-nowrap text-cyan-400 min-w-[68px]">对话</th>
+                    <th class="py-3 px-2 text-center whitespace-nowrap text-purple-400 min-w-[68px]">思考</th>
+                    <th class="py-3 px-2 text-center whitespace-nowrap text-emerald-400 min-w-[68px]">视觉</th>
+                    <th class="py-3 px-2 text-center whitespace-nowrap text-indigo-400 min-w-[68px]">工具</th>
+                    <th class="py-3 px-2 text-center whitespace-nowrap text-amber-400 min-w-[68px]">鹈鹕</th>
+                    <th class="py-3 px-2 text-center whitespace-nowrap hidden xl:table-cell w-[9%]">总耗时</th>
+                    <th class="py-3 px-2 text-right whitespace-nowrap w-[96px] xl:w-[130px]">操作</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y font-mono transition-colors"
@@ -911,8 +1230,21 @@
                     </td>
 
                     <!-- Chat status -->
-                    <td v-if="checkChat" class="py-3 px-2 text-center overflow-hidden">
-                      <button @click="openInspector(res, 'chat')" 
+                    <td class="py-3 px-2 text-center overflow-hidden">
+                      <button v-if="isDimUntested(res, 'chat')"
+                              @click="testSingleDimension(res.model, 'chat')"
+                              :disabled="isTesting"
+                              class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[62px]"
+                              :class="isDarkMode ? 'bg-slate-800/80 hover:bg-cyan-950/40 text-slate-400 hover:text-cyan-300 border-slate-700/60 hover:border-cyan-500/40' : 'bg-slate-100 hover:bg-cyan-50 text-slate-500 hover:text-cyan-700 border-slate-300 hover:border-cyan-300'"
+                              title="点击单项检测此模型：基础对话">
+                        <span class="flex items-center space-x-1">
+                          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0"></span>
+                          <span>未检测</span>
+                        </span>
+                        <span class="text-[9px] font-normal font-mono opacity-60 leading-none mt-0.5">↻ 点击测</span>
+                      </button>
+                      <button v-else
+                              @click="openInspector(res, 'chat')" 
                               class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px]"
                               :class="dimBadgeClass(res, 'chat')"
                               title="点击查看完整对话请求与返回报文">
@@ -925,8 +1257,21 @@
                     </td>
 
                     <!-- Thinking status -->
-                    <td v-if="checkThinking" class="py-3 px-2 text-center overflow-hidden">
-                      <button @click="openInspector(res, 'thinking')" 
+                    <td class="py-3 px-2 text-center overflow-hidden">
+                      <button v-if="isDimUntested(res, 'thinking')"
+                              @click="testSingleDimension(res.model, 'thinking')"
+                              :disabled="isTesting"
+                              class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[62px]"
+                              :class="isDarkMode ? 'bg-slate-800/80 hover:bg-purple-950/40 text-slate-400 hover:text-purple-300 border-slate-700/60 hover:border-purple-500/40' : 'bg-slate-100 hover:bg-purple-50 text-slate-500 hover:text-purple-700 border-slate-300 hover:border-purple-300'"
+                              title="点击单项检测此模型：深度思考">
+                        <span class="flex items-center space-x-1">
+                          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0"></span>
+                          <span>未检测</span>
+                        </span>
+                        <span class="text-[9px] font-normal font-mono opacity-60 leading-none mt-0.5">↻ 点击测</span>
+                      </button>
+                      <button v-else
+                              @click="openInspector(res, 'thinking')" 
                               class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px]"
                               :class="dimBadgeClass(res, 'thinking')"
                               :title="res.thinking?.detail || res.thinking?.error || '点击查看完整思考过程报文'">
@@ -939,11 +1284,24 @@
                     </td>
 
                     <!-- Vision status -->
-                    <td v-if="checkVision" class="py-3 px-2 text-center overflow-hidden">
-                      <button @click="openInspector(res, 'vision')" 
+                    <td class="py-3 px-2 text-center overflow-hidden">
+                      <button v-if="isDimUntested(res, 'vision')"
+                              @click="testSingleDimension(res.model, 'vision')"
+                              :disabled="isTesting"
+                              class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[62px]"
+                              :class="isDarkMode ? 'bg-slate-800/80 hover:bg-emerald-950/40 text-slate-400 hover:text-emerald-300 border-slate-700/60 hover:border-emerald-500/40' : 'bg-slate-100 hover:bg-emerald-50 text-slate-500 hover:text-emerald-700 border-slate-300 hover:border-emerald-300'"
+                              title="点击单项检测此模型：图像视觉">
+                        <span class="flex items-center space-x-1">
+                          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0"></span>
+                          <span>未检测</span>
+                        </span>
+                        <span class="text-[9px] font-normal font-mono opacity-60 leading-none mt-0.5">↻ 点击测</span>
+                      </button>
+                      <button v-else
+                              @click="openInspector(res, 'vision')" 
                               class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px]"
                               :class="dimBadgeClass(res, 'vision')"
-                              :title="res.vision.detail || res.vision.error || '点击查看完整视觉请求与返回报文'">
+                              :title="res.vision?.detail || res.vision?.error || '点击查看完整视觉请求与返回报文'">
                         <span class="flex items-center space-x-1">
                           <span class="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
                           <span>{{ dimStatusText(res, 'vision') }}</span>
@@ -953,11 +1311,24 @@
                     </td>
 
                     <!-- Tools status -->
-                    <td v-if="checkTools" class="py-3 px-2 text-center overflow-hidden">
-                      <button @click="openInspector(res, 'tools')" 
+                    <td class="py-3 px-2 text-center overflow-hidden">
+                      <button v-if="isDimUntested(res, 'tools')"
+                              @click="testSingleDimension(res.model, 'tools')"
+                              :disabled="isTesting"
+                              class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[62px]"
+                              :class="isDarkMode ? 'bg-slate-800/80 hover:bg-indigo-950/40 text-slate-400 hover:text-indigo-300 border-slate-700/60 hover:border-indigo-500/40' : 'bg-slate-100 hover:bg-indigo-50 text-slate-500 hover:text-indigo-700 border-slate-300 hover:border-indigo-300'"
+                              title="点击单项检测此模型：原生工具调用">
+                        <span class="flex items-center space-x-1">
+                          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0"></span>
+                          <span>未检测</span>
+                        </span>
+                        <span class="text-[9px] font-normal font-mono opacity-60 leading-none mt-0.5">↻ 点击测</span>
+                      </button>
+                      <button v-else
+                              @click="openInspector(res, 'tools')" 
                               class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px]"
                               :class="dimBadgeClass(res, 'tools')"
-                              :title="res.tools.detail || res.tools.error || '点击查看完整工具调用请求与返回报文'">
+                              :title="res.tools?.detail || res.tools?.error || '点击查看完整工具调用请求与返回报文'">
                         <span class="flex items-center space-x-1">
                           <span class="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
                           <span>{{ dimStatusText(res, 'tools') }}</span>
@@ -967,8 +1338,21 @@
                     </td>
 
                     <!-- Pelican status -->
-                    <td v-if="checkPelican" class="py-3 px-2 text-center overflow-hidden">
-                      <button @click="res.pelican?.htmlCode ? openPelicanRenderer(res.model) : openInspector(res, 'pelican')" 
+                    <td class="py-3 px-2 text-center overflow-hidden">
+                      <button v-if="isDimUntested(res, 'pelican')"
+                              @click="testSingleDimension(res.model, 'pelican')"
+                              :disabled="isTesting"
+                              class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[62px]"
+                              :class="isDarkMode ? 'bg-slate-800/80 hover:bg-amber-950/40 text-slate-400 hover:text-amber-300 border-slate-700/60 hover:border-amber-500/40' : 'bg-slate-100 hover:bg-amber-50 text-slate-500 hover:text-amber-700 border-slate-300 hover:border-amber-300'"
+                              title="点击单项检测此模型：鹈鹕单车 SVG">
+                        <span class="flex items-center space-x-1">
+                          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0"></span>
+                          <span>未检测</span>
+                        </span>
+                        <span class="text-[9px] font-normal font-mono opacity-60 leading-none mt-0.5">↻ 点击测</span>
+                      </button>
+                      <button v-else
+                              @click="res.pelican?.htmlCode ? openPelicanRenderer(res.model) : openInspector(res, 'pelican')" 
                               class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[64px]"
                               :class="dimBadgeClass(res, 'pelican')"
                               :title="res.pelican?.detail || res.pelican?.error || '点击查看鹈鹕 SVG 动画'">
@@ -979,6 +1363,7 @@
                         <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">{{ dimLatencyText(res, 'pelican') || '\u00a0' }}</span>
                       </button>
                     </td>
+
                     <!-- Latency -->
                     <td class="py-3 px-2.5 text-center hidden xl:table-cell">
                       <span class="text-xs font-semibold whitespace-nowrap" 
@@ -989,20 +1374,21 @@
 
                     <!-- Actions -->
                     <td class="py-3 px-2 font-sans whitespace-nowrap">
-                      <div class="flex items-center justify-end gap-1">
-                      <button @click="openInspector(res, 'tools')" 
-                              class="px-2.5 py-1 text-xs rounded-lg font-medium border transition inline-flex items-center space-x-1 whitespace-nowrap flex-shrink-0"
-                              :class="isDarkMode ? 'bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border-indigo-500/40' : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'"
-                              title="查看完整请求参数、返回报文与判定依据">
-                        <svg class="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
-                        <span class="hidden xl:inline">详情</span>
-                      </button>
-                      <button @click="testSingleDirect(res.model)" :disabled="isTesting"
-                              class="px-2 py-1 text-xs rounded-lg border transition text-slate-400 hover:text-indigo-400 flex-shrink-0 leading-none"
-                              :class="isDarkMode ? 'bg-slate-800 hover:bg-slate-700 border-slate-700' : 'bg-slate-100 hover:bg-slate-200 border-slate-300'"
-                              title="重新检测此模型">
-                        ↻
-                      </button>
+                      <div class="flex items-center justify-end gap-1.5">
+                        <button @click="openInspector(res, 'tools')" 
+                                class="px-2.5 py-1 text-xs rounded-lg font-medium border transition inline-flex items-center space-x-1 whitespace-nowrap flex-shrink-0"
+                                :class="isDarkMode ? 'bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border-indigo-500/40' : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'"
+                                title="查看完整请求参数、返回报文与判定依据">
+                          <svg class="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+                          <span class="hidden xl:inline">详情</span>
+                        </button>
+                        <button @click="testSingleDirect(res.model)" :disabled="isTesting"
+                                class="px-2 py-1 text-xs rounded-lg border transition flex-shrink-0 flex items-center space-x-1 leading-none shadow-sm"
+                                :class="isDarkMode ? 'bg-slate-800 hover:bg-indigo-950/40 text-slate-300 hover:text-indigo-300 border-slate-700 hover:border-indigo-500/50' : 'bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border-slate-300 hover:border-indigo-300'"
+                                title="单项重新检测此模型的所有维度">
+                          <span class="text-xs font-bold leading-none">↻</span>
+                          <span class="text-[11px] font-medium hidden sm:inline">重测</span>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -1011,8 +1397,140 @@
             </div>
           </div>
 
-          <!-- CARDS VIEW -->
-          <div v-if="testResults.length > 0 && viewMode === 'cards'" 
+                    <!-- TABLE VIEW (IMAGE) -->
+          <div v-if="testMode === 'image' && imageTestResults.length > 0 && viewMode === 'table'" 
+               class="rounded-2xl shadow-xl overflow-hidden border transition-colors"
+               :class="isDarkMode ? 'glass-dark border-slate-800' : 'glass-light border-slate-200'">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs table-fixed">
+                <thead>
+                  <tr class="border-b transition-colors font-semibold tracking-wide"
+                      :class="isDarkMode ? 'border-slate-800 bg-slate-900/80 text-slate-400' : 'border-slate-200 bg-slate-100/90 text-slate-600'">
+                    <th class="py-3 px-3 whitespace-nowrap w-[26%] min-w-[140px]">模型名称 (Model ID)</th>
+                    <th class="py-3 px-2 text-center whitespace-nowrap text-pink-400 w-[27%]">图片生成 (Generations)</th>
+                    <th class="py-3 px-2 text-center whitespace-nowrap text-rose-400 w-[27%]">图片编辑 (Edits)</th>
+                    <th class="py-3 px-2 text-center whitespace-nowrap hidden sm:table-cell w-[10%]">总耗时</th>
+                    <th class="py-3 px-2 text-right whitespace-nowrap w-[96px] xl:w-[130px]">操作</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y font-mono transition-colors"
+                       :class="isDarkMode ? 'divide-slate-800/60' : 'divide-slate-200'">
+                  <tr v-for="res in imageTestResults" :key="res.model" 
+                      class="transition group"
+                      :class="isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50/80'">
+                    
+                    <!-- Model ID -->
+                    <td class="py-3.5 px-3 font-bold" :class="isDarkMode ? 'text-slate-200' : 'text-slate-800'">
+                      <div class="flex items-center space-x-2 overflow-hidden">
+                        <span class="w-2 h-2 rounded-full flex-shrink-0" 
+                              :class="res.image_gen?.supported && res.image_edit?.supported ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : (res.image_gen?.supported || res.image_edit?.supported ? 'bg-pink-500' : 'bg-rose-500')"></span>
+                        <span class="truncate" :title="res.model">{{ res.model }}</span>
+                      </div>
+                    </td>
+
+                    <!-- Image Gen Status -->
+                    <td class="py-3 px-2 text-center overflow-hidden">
+                      <div class="flex items-center justify-center space-x-2">
+                        <button v-if="isDimUntested(res, 'image_gen')"
+                                @click="testSingleDimension(res.model, 'image_gen')"
+                                :disabled="isTesting"
+                                class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap"
+                                :class="isDarkMode ? 'bg-slate-800/80 hover:bg-pink-950/40 text-slate-400 hover:text-pink-300 border-slate-700/60 hover:border-pink-500/40' : 'bg-slate-100 hover:bg-pink-50 text-slate-500 hover:text-pink-700 border-slate-300 hover:border-pink-300'"
+                                title="点击单项检测此模型：图片生成">
+                          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0"></span>
+                          <span>未检测</span>
+                          <span class="text-[10px] ml-0.5 opacity-60 hover:opacity-100">↻</span>
+                        </button>
+                        <template v-else>
+                          <img v-if="res.image_gen?.imageUrl" 
+                               :src="res.image_gen.imageUrl" 
+                               @click="openLightbox(res.image_gen.imageUrl, res.model + ' 生图结果', res.image_gen.prompt)"
+                               class="w-8 h-8 rounded-lg object-cover border border-emerald-500/40 cursor-pointer shadow-sm hover:scale-110 transition flex-shrink-0"
+                               :title="'点击放大全屏查看: ' + res.image_gen.prompt" />
+                          
+                          <button @click="openInspector(res, 'image_gen')"
+                                  class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[62px]"
+                                  :class="dimBadgeClass(res, 'image_gen')"
+                                  :title="res.image_gen?.detail || res.image_gen?.error || '点击查看完整生图报文'">
+                            <span class="flex items-center space-x-1">
+                              <span class="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
+                              <span>{{ dimStatusText(res, 'image_gen') }}</span>
+                            </span>
+                            <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">{{ dimLatencyText(res, 'image_gen') || '\u00a0' }}</span>
+                          </button>
+                        </template>
+                      </div>
+                    </td>
+
+                    <!-- Image Edit Status -->
+                    <td class="py-3 px-2 text-center overflow-hidden">
+                      <div class="flex items-center justify-center space-x-2">
+                        <button v-if="isDimUntested(res, 'image_edit')"
+                                @click="testSingleDimension(res.model, 'image_edit')"
+                                :disabled="isTesting"
+                                class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap"
+                                :class="isDarkMode ? 'bg-slate-800/80 hover:bg-rose-950/40 text-slate-400 hover:text-rose-300 border-slate-700/60 hover:border-rose-500/40' : 'bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-700 border-slate-300 hover:border-rose-300'"
+                                title="点击单项检测此模型：图片编辑">
+                          <span class="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0"></span>
+                          <span>未检测</span>
+                          <span class="text-[10px] ml-0.5 opacity-60 hover:opacity-100">↻</span>
+                        </button>
+                        <template v-else>
+                          <img v-if="res.image_edit?.imageUrl" 
+                               :src="res.image_edit.imageUrl" 
+                               @click="openLightbox(res.image_edit.imageUrl, res.model + ' 编辑结果', res.image_edit.prompt)"
+                               class="w-8 h-8 rounded-lg object-cover border border-emerald-500/40 cursor-pointer shadow-sm hover:scale-110 transition flex-shrink-0"
+                               :title="'点击放大全屏查看: ' + res.image_edit.prompt" />
+                          
+                          <button @click="openInspector(res, 'image_edit')"
+                                  class="inline-flex flex-col items-center justify-center px-2 py-1 rounded-xl border text-[11px] font-semibold transition cursor-pointer hover:scale-105 active:scale-95 whitespace-nowrap leading-tight min-w-[62px]"
+                                  :class="dimBadgeClass(res, 'image_edit')"
+                                  :title="res.image_edit?.detail || res.image_edit?.error || '点击查看完整编辑报文'">
+                            <span class="flex items-center space-x-1">
+                              <span class="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
+                              <span>{{ dimStatusText(res, 'image_edit') }}</span>
+                            </span>
+                            <span class="text-[9px] font-normal font-mono opacity-75 leading-none mt-0.5">{{ dimLatencyText(res, 'image_edit') || '\u00a0' }}</span>
+                          </button>
+                        </template>
+                      </div>
+                    </td>
+
+                    <!-- Latency -->
+                    <td class="py-3 px-2.5 text-center hidden sm:table-cell">
+                      <span class="text-xs font-semibold whitespace-nowrap" 
+                            :class="res.totalLatency < 3000 ? 'text-emerald-500' : (res.totalLatency < 8000 ? 'text-amber-500' : (isDarkMode ? 'text-slate-400' : 'text-slate-500'))">
+                        {{ formatDuration(res.totalLatency) }}
+                      </span>
+                    </td>
+
+                    <!-- Actions -->
+                    <td class="py-3 px-2 font-sans whitespace-nowrap">
+                      <div class="flex items-center justify-end gap-1.5">
+                        <button @click="openInspector(res, res.image_gen?.supported ? 'image_gen' : 'image_edit')" 
+                                class="px-2.5 py-1 text-xs rounded-lg font-medium border transition inline-flex items-center space-x-1 whitespace-nowrap flex-shrink-0"
+                                :class="isDarkMode ? 'bg-pink-600/20 hover:bg-pink-600/30 text-pink-300 border-pink-500/40' : 'bg-pink-50 hover:bg-pink-100 text-pink-700 border-pink-200'"
+                                title="查看图片请求参数与抓包报文">
+                          <svg class="w-3.5 h-3.5 text-pink-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+                          <span class="hidden xl:inline">详情</span>
+                        </button>
+                        <button @click="testSingleDirect(res.model)" :disabled="isTesting"
+                                class="px-2 py-1 text-xs rounded-lg border transition flex-shrink-0 flex items-center space-x-1 leading-none shadow-sm"
+                                :class="isDarkMode ? 'bg-slate-800 hover:bg-pink-950/40 text-slate-300 hover:text-pink-300 border-slate-700 hover:border-pink-500/50' : 'bg-slate-100 hover:bg-pink-50 text-slate-700 hover:text-pink-700 border-slate-300 hover:border-pink-300'"
+                                title="单项重新检测此模型的所有维度">
+                          <span class="text-xs font-bold leading-none">↻</span>
+                          <span class="text-[11px] font-medium hidden sm:inline">重测</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- CARDS VIEW (CHAT) -->
+          <div v-if="testMode === 'chat' && testResults.length > 0 && viewMode === 'cards'" 
                class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div v-for="res in testResults" :key="res.model" 
                  class="rounded-2xl p-4 border shadow-lg transition-all space-y-3"
@@ -1143,9 +1661,114 @@
             </div>
           </div>
 
-        </div>
+          <!-- CARDS VIEW (IMAGE) -->
+          <div v-if="testMode === 'image' && imageTestResults.length > 0 && viewMode === 'cards'" 
+               class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div v-for="res in imageTestResults" :key="res.model" 
+                 class="rounded-2xl p-4 border shadow-lg transition-all space-y-3"
+                 :class="isDarkMode ? 'glass-dark border-slate-800/80 hover:border-slate-700' : 'glass-light border-slate-200 hover:border-slate-300'">
+              
+              <!-- Card Header -->
+              <div class="flex items-start justify-between">
+                <div>
+                  <h4 class="font-bold text-sm font-mono truncate max-w-[200px]" :class="isDarkMode ? 'text-slate-100' : 'text-slate-900'" :title="res.model">
+                    {{ res.model }}
+                  </h4>
+                  <div class="text-[11px] mt-0.5 flex items-center space-x-2" :class="isDarkMode ? 'text-slate-400' : 'text-slate-500'">
+                    <span>耗时: <strong class="font-mono">{{ formatDuration(res.totalLatency) }}</strong></span>
+                    <span>·</span>
+                    <span>{{ res.timestamp }}</span>
+                  </div>
+                </div>
+                <button @click="openInspector(res, res.image_gen?.supported ? 'image_gen' : 'image_edit')" 
+                        class="text-xs text-pink-400 hover:text-pink-300 font-bold inline-flex items-center space-x-1">
+                  <span>详情 →</span>
+                </button>
+              </div>
 
-      </div>
+              <!-- Feature Pills Grid (Image Gen & Image Edit) -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                
+                <!-- Image Gen Pill -->
+                <div @click="openInspector(res, 'image_gen')"
+                     class="p-2.5 rounded-xl border flex flex-col justify-between cursor-pointer transition hover:scale-[1.02] active:scale-[0.98]"
+                     :class="cardDimClass(res, 'image_gen')"
+                     title="点击查看完整图片生成报文">
+                  <div class="flex items-center justify-between mb-1.5">
+                    <span class="font-bold flex items-center space-x-1">
+                      <span>🎨</span>
+                      <span>图片生成</span>
+                    </span>
+                    <span class="text-xs font-bold">{{ res.image_gen?.supported ? '✓ 成功' : (isDimUntested(res, 'image_gen') ? '— 未检测' : (res.network?.image_gen?.timedOut ? '⏱ 超时' : '✕ 失败')) }}</span>
+                  </div>
+
+                  <!-- Thumbnail & prompt -->
+                  <div v-if="res.image_gen?.imageUrl" class="flex items-center space-x-2 my-1">
+                    <img :src="res.image_gen.imageUrl" 
+                         class="w-10 h-10 rounded-lg object-cover border border-emerald-500/30 flex-shrink-0" />
+                    <div class="text-[10px] opacity-80 line-clamp-2 leading-tight">
+                      {{ res.image_gen.prompt }}
+                    </div>
+                  </div>
+                  <div v-else class="text-[10px] my-1 opacity-80 truncate" :title="res.image_gen?.error">
+                    {{ res.image_gen?.error || '未执行' }}
+                  </div>
+
+                  <div class="text-[9px] font-mono opacity-70 mt-1 flex items-center justify-between">
+                    <span>{{ res.image_gen?.size || '1024x1024' }}</span>
+                    <span>{{ formatDuration(res.image_gen?.latency) }}</span>
+                  </div>
+                </div>
+
+                <!-- Image Edit Pill -->
+                <div @click="openInspector(res, 'image_edit')"
+                     class="p-2.5 rounded-xl border flex flex-col justify-between cursor-pointer transition hover:scale-[1.02] active:scale-[0.98]"
+                     :class="cardDimClass(res, 'image_edit')"
+                     title="点击查看完整图片编辑报文">
+                  <div class="flex items-center justify-between mb-1.5">
+                    <span class="font-bold flex items-center space-x-1">
+                      <span>✏️</span>
+                      <span>图片编辑</span>
+                    </span>
+                    <span class="text-xs font-bold">{{ res.image_edit?.supported ? '✓ 成功' : (isDimUntested(res, 'image_edit') ? '— 未检测' : (res.network?.image_edit?.timedOut ? '⏱ 超时' : '✕ 失败')) }}</span>
+                  </div>
+
+                  <!-- Visual comparison in card -->
+                  <div v-if="res.image_edit?.imageUrl" class="flex items-center space-x-1.5 my-1">
+                    <img :src="res.image_edit.originalImageUrl || 'image/example.jpg'" class="w-8 h-8 rounded object-cover border border-slate-600 flex-shrink-0" title="底图" />
+                    <span class="text-slate-500 text-[10px]">➔</span>
+                    <img :src="res.image_edit.imageUrl" class="w-8 h-8 rounded object-cover border border-emerald-500/40 flex-shrink-0" title="编辑结果" />
+                    <span class="text-[10px] opacity-80 truncate ml-1">{{ res.image_edit.prompt }}</span>
+                  </div>
+                  <div v-else class="text-[10px] my-1 opacity-80 truncate" :title="res.image_edit?.error">
+                    {{ res.image_edit?.error || '未执行' }}
+                  </div>
+
+                  <div class="text-[9px] font-mono opacity-70 mt-1 flex items-center justify-between">
+                    <span>底图: example.jpg</span>
+                    <span>{{ formatDuration(res.image_edit?.latency) }}</span>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Footer -->
+              <div class="pt-2 border-t flex items-center justify-between text-xs"
+                   :class="isDarkMode ? 'border-slate-800' : 'border-slate-200'">
+                <button @click="openInspector(res, res.image_gen?.supported ? 'image_gen' : 'image_edit')" class="text-xs text-pink-400 hover:underline">
+                  查看抓包报文
+                </button>
+                <button @click="testSingleDirect(res.model)" :disabled="isTesting" class="text-xs text-indigo-400 hover:underline">
+                  重新检测
+                </button>
+              </div>
+
+            </div>
+          </div>
+
+        </div> <!-- Closes lg:col-span-8 xl:col-span-8 -->
+
+      </div> <!-- Closes grid grid-cols-1 lg:grid-cols-12 gap-6 -->
 
     </main>
 
@@ -1205,7 +1828,46 @@
         </div>
 
         <!-- Main Category Tabs (Now with Thinking & Pelican) -->
-        <div class="px-5 pt-2.5 border-b flex flex-wrap items-center gap-x-2 sm:gap-x-4 gap-y-1 text-xs font-bold transition-colors select-none flex-shrink-0"
+        <!-- Main Category Tabs: Image Mode vs Chat Mode -->
+        <div v-if="activeInspectorResult.image_gen || activeInspectorResult.image_edit"
+             class="px-5 pt-2.5 border-b flex flex-wrap items-center gap-x-2 sm:gap-x-4 gap-y-1 text-xs font-bold transition-colors select-none flex-shrink-0"
+             :class="isDarkMode ? 'border-slate-800 bg-slate-900/40' : 'border-slate-200 bg-slate-50/50'">
+          
+          <!-- Tab 1: Image Gen -->
+          <button @click="inspectorTab = 'image_gen'" 
+                  class="pb-2.5 border-b-2 transition flex items-center space-x-1.5 flex-shrink-0 whitespace-nowrap"
+                  :class="inspectorTab === 'image_gen' ? 'border-pink-500 text-pink-400 font-extrabold' : (isDarkMode ? 'border-transparent text-slate-400 hover:text-slate-200' : 'border-transparent text-slate-500 hover:text-slate-900')">
+            <span>🎨</span>
+            <span>图片生成 (Generations)</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded font-mono whitespace-nowrap"
+                  :class="activeInspectorResult.image_gen?.supported ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-700 text-slate-400'">
+              {{ activeInspectorResult.image_gen?.supported ? '✓ 成功' : '✕ 失败' }}
+            </span>
+          </button>
+
+          <!-- Tab 2: Image Edit -->
+          <button @click="inspectorTab = 'image_edit'" 
+                  class="pb-2.5 border-b-2 transition flex items-center space-x-1.5 flex-shrink-0 whitespace-nowrap"
+                  :class="inspectorTab === 'image_edit' ? 'border-rose-500 text-rose-400 font-extrabold' : (isDarkMode ? 'border-transparent text-slate-400 hover:text-slate-200' : 'border-transparent text-slate-500 hover:text-slate-900')">
+            <span>✏️</span>
+            <span>图片编辑 (Edits)</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded font-mono whitespace-nowrap"
+                  :class="activeInspectorResult.image_edit?.supported ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-700 text-slate-400'">
+              {{ activeInspectorResult.image_edit?.supported ? '✓ 成功' : '✕ 失败' }}
+            </span>
+          </button>
+
+          <!-- Tab 3: Raw JSON -->
+          <button @click="inspectorTab = 'raw'" 
+                  class="pb-2.5 border-b-2 transition flex items-center space-x-1.5 flex-shrink-0 whitespace-nowrap"
+                  :class="inspectorTab === 'raw' ? 'border-indigo-500 text-indigo-400 font-extrabold' : (isDarkMode ? 'border-transparent text-slate-400 hover:text-slate-200' : 'border-transparent text-slate-500 hover:text-slate-900')">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+            <span>原始 JSON</span>
+          </button>
+        </div>
+
+        <!-- Chat Mode Tabs -->
+        <div v-else class="px-5 pt-2.5 border-b flex flex-wrap items-center gap-x-2 sm:gap-x-4 gap-y-1 text-xs font-bold transition-colors select-none flex-shrink-0"
              :class="isDarkMode ? 'border-slate-800 bg-slate-900/40' : 'border-slate-200 bg-slate-50/50'">
           
           <!-- Tab 1: Pelican -->
@@ -2182,6 +2844,305 @@
 
           </div>
 
+                    <!-- ================= TAB: IMAGE GEN INSPECTOR ================= -->
+          <div v-show="inspectorTab === 'image_gen'" class="space-y-4">
+            <!-- Verdict Banner -->
+            <div class="p-4 rounded-xl border flex flex-wrap items-center justify-between gap-3 shadow-sm"
+                 :class="activeInspectorResult.image_gen?.supported ? (isDarkMode ? 'bg-emerald-950/40 border-emerald-800 text-emerald-300' : 'bg-emerald-50 border-emerald-300 text-emerald-900') : (isDarkMode ? 'bg-rose-950/40 border-rose-800 text-rose-300' : 'bg-rose-50 border-rose-300 text-rose-900')">
+              <div class="flex items-center space-x-3">
+                <div class="text-2xl">{{ activeInspectorResult.image_gen?.supported ? '🟢' : '🔴' }}</div>
+                <div>
+                  <h4 class="font-bold text-sm sm:text-base">
+                    {{ activeInspectorResult.image_gen?.supported ? '模型准确支持 OpenAI /images/generations 图片生成接口' : '图片生成失败或接口不可用' }}
+                  </h4>
+                  <p class="text-[11px] opacity-80 mt-0.5">
+                    响应耗时: {{ formatDuration(activeInspectorResult.image_gen?.latency) }} · 规格: {{ activeInspectorResult.image_gen?.size || '1024x1024' }} · 结论: {{ activeInspectorResult.image_gen?.detail || activeInspectorResult.image_gen?.error }}
+                  </p>
+                  <p v-if="activeInspectorResult.network?.image_gen?.timedOut" class="text-[11px] font-bold mt-1">
+                    ⏱ 本次生图请求超时（阈值 {{ activeInspectorResult.network.image_gen.timeoutLabel }}），接口未在规定时间内返回。
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Image Content & Prompt Box -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              <!-- Left: Image Preview -->
+              <div class="lg:col-span-5 rounded-xl border p-3 flex flex-col items-center justify-between space-y-3"
+                   :class="isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-100 border-slate-200'">
+                <div class="w-full flex items-center justify-between text-xs font-bold text-slate-400">
+                  <span>生成结果渲染预览:</span>
+                  <span class="text-[10px] font-mono text-pink-400">{{ activeInspectorResult.image_gen?.size }}</span>
+                </div>
+                
+                <div v-if="activeInspectorResult.image_gen?.imageUrl" class="relative group w-full flex items-center justify-center bg-slate-950/40 rounded-xl p-2 border border-slate-800/80">
+                  <img :src="activeInspectorResult.image_gen.imageUrl" 
+                       class="max-h-[300px] w-auto rounded-lg object-contain shadow-lg cursor-pointer hover:scale-[1.02] transition"
+                       @click="openLightbox(activeInspectorResult.image_gen.imageUrl, activeInspectorResult.model + ' 生图结果', activeInspectorResult.image_gen.prompt)"
+                       title="点击放大全屏查看" />
+                </div>
+                <div v-else class="h-44 w-full flex flex-col items-center justify-center text-slate-500 text-xs">
+                  <span>未成功返回图片数据</span>
+                  <span class="text-[10px] text-rose-400 mt-1">{{ activeInspectorResult.image_gen?.error }}</span>
+                </div>
+
+                <!-- Actions -->
+                <div v-if="activeInspectorResult.image_gen?.imageUrl" class="w-full flex items-center justify-end space-x-2">
+                  <button @click="openLightbox(activeInspectorResult.image_gen.imageUrl, activeInspectorResult.model + ' 生图结果', activeInspectorResult.image_gen.prompt)" 
+                          class="px-2.5 py-1 text-xs rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 transition">
+                    🔍 全屏查看
+                  </button>
+                  <button @click="downloadImageUrl(activeInspectorResult.image_gen.imageUrl, activeInspectorResult.model + '-generated.png')" 
+                          class="px-2.5 py-1 text-xs rounded-lg font-bold bg-pink-600 hover:bg-pink-500 text-white transition shadow">
+                    ⬇️ 下载原图
+                  </button>
+                </div>
+              </div>
+
+              <!-- Right: Prompt info -->
+              <div class="lg:col-span-7 space-y-3">
+                <div class="p-3.5 rounded-xl border space-y-1.5"
+                     :class="isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-100 border-slate-200'">
+                  <div class="text-xs font-bold text-slate-400">用户生图提示词 (Prompt):</div>
+                  <div class="p-2.5 rounded-lg border text-xs font-mono whitespace-pre-wrap leading-relaxed"
+                       :class="isDarkMode ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-300 text-slate-800'">
+                    {{ activeInspectorResult.image_gen?.prompt || '(未记录)' }}
+                  </div>
+                </div>
+
+                <div v-if="activeInspectorResult.image_gen?.revisedPrompt" class="p-3.5 rounded-xl border space-y-1.5"
+                     :class="isDarkMode ? 'bg-pink-950/20 border-pink-900/40 text-pink-300' : 'bg-pink-50 border-pink-200 text-pink-900'">
+                  <div class="text-xs font-bold flex items-center justify-between">
+                    <span>模型智能改写提示词 (Revised Prompt):</span>
+                    <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-pink-500/20">DALL-E 3 Feature</span>
+                  </div>
+                  <div class="p-2.5 rounded-lg border text-xs font-mono whitespace-pre-wrap leading-relaxed"
+                       :class="isDarkMode ? 'bg-slate-950/80 border-slate-800 text-pink-200' : 'bg-white border-pink-200 text-pink-900'">
+                    {{ activeInspectorResult.image_gen.revisedPrompt }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Traffic Toolbar -->
+            <div class="flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl border transition-colors"
+                 :class="isDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-slate-100 border-slate-200'">
+              <div class="flex items-center space-x-1 text-xs">
+                <button @click="activeTrafficSubTab = 'split'"
+                        class="px-2.5 py-1 rounded-lg font-medium transition"
+                        :class="activeTrafficSubTab === 'split' ? 'bg-pink-600 text-white shadow' : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')">
+                  ⫤⊨ 并排对比
+                </button>
+                <button @click="activeTrafficSubTab = 'request'"
+                        class="px-2.5 py-1 rounded-lg font-medium transition"
+                        :class="activeTrafficSubTab === 'request' ? 'bg-pink-600 text-white shadow' : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')">
+                  📤 完整请求
+                </button>
+                <button @click="activeTrafficSubTab = 'response'"
+                        class="px-2.5 py-1 rounded-lg font-medium transition"
+                        :class="activeTrafficSubTab === 'response' ? 'bg-pink-600 text-white shadow' : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')">
+                  📥 完整返回
+                </button>
+                <button @click="activeTrafficSubTab = 'curl'"
+                        class="px-2.5 py-1 rounded-lg font-medium transition"
+                        :class="activeTrafficSubTab === 'curl' ? 'bg-pink-600 text-white shadow' : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')">
+                  💻 cURL 命令行
+                </button>
+              </div>
+
+              <div class="flex items-center space-x-1.5 text-xs">
+                <button @click="copyPayload(activeInspectorResult.network?.image_gen?.requestBody, '已复制生图请求参数 JSON')"
+                        class="px-2 py-1 rounded-lg border transition text-[11px] font-mono hover:text-pink-400"
+                        :class="isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-300 text-slate-700'">
+                  📋 复制请求
+                </button>
+                <button @click="copyPayload(activeInspectorResult.network?.image_gen?.responseBody, '已复制生图返回 JSON')"
+                        class="px-2 py-1 rounded-lg border transition text-[11px] font-mono hover:text-pink-400"
+                        :class="isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-300 text-slate-700'">
+                  📥 复制返回
+                </button>
+                <button @click="copyCurlCommand(activeInspectorResult.network?.image_gen)"
+                        class="px-2 py-1 rounded-lg border transition text-[11px] font-mono hover:text-pink-400"
+                        :class="isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-300 text-slate-700'">
+                  💻 复制 cURL
+                </button>
+              </div>
+            </div>
+
+            <!-- Traffic Panel Body -->
+            <div class="rounded-xl border p-3 font-mono text-xs overflow-hidden"
+                 :class="isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'">
+              <div v-if="activeTrafficSubTab === 'split'" class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div class="space-y-1">
+                  <div class="text-[11px] font-bold text-slate-400 pb-1 border-b border-slate-800">请求载荷 (Request Body):</div>
+                  <pre class="p-2.5 rounded bg-slate-900/60 overflow-auto max-h-[360px] text-[11px] leading-relaxed">{{ safeJsonFormat(activeInspectorResult.network?.image_gen?.requestBody) }}</pre>
+                </div>
+                <div class="space-y-1">
+                  <div class="text-[11px] font-bold text-slate-400 pb-1 border-b border-slate-800">服务端响应 (Response Body):</div>
+                  <pre class="p-2.5 rounded bg-slate-900/60 overflow-auto max-h-[360px] text-[11px] leading-relaxed">{{ safeJsonFormat(activeInspectorResult.network?.image_gen?.responseBody || activeInspectorResult.network?.image_gen?.responseRaw) }}</pre>
+                </div>
+              </div>
+
+              <div v-else-if="activeTrafficSubTab === 'request'" class="space-y-1">
+                <div class="text-[11px] font-bold text-slate-400 pb-1 border-b border-slate-800">完整请求载荷:</div>
+                <pre class="p-3 rounded bg-slate-900/60 overflow-auto max-h-[460px] text-[11px] leading-relaxed">{{ safeJsonFormat(activeInspectorResult.network?.image_gen?.requestBody) }}</pre>
+              </div>
+
+              <div v-else-if="activeTrafficSubTab === 'response'" class="space-y-1">
+                <div class="text-[11px] font-bold text-slate-400 pb-1 border-b border-slate-800">完整服务端返回:</div>
+                <pre class="p-3 rounded bg-slate-900/60 overflow-auto max-h-[460px] text-[11px] leading-relaxed">{{ safeJsonFormat(activeInspectorResult.network?.image_gen?.responseBody || activeInspectorResult.network?.image_gen?.responseRaw) }}</pre>
+              </div>
+
+              <div v-else-if="activeTrafficSubTab === 'curl'" class="space-y-1">
+                <div class="text-[11px] font-bold text-slate-400 pb-1 border-b border-slate-800">终端复现 cURL 命令:</div>
+                <pre class="p-3 rounded bg-slate-900/60 overflow-auto max-h-[460px] text-[11px] text-pink-300 leading-relaxed font-mono select-all">{{ getTrafficCurl(activeInspectorResult.network?.image_gen) }}</pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- ================= TAB: IMAGE EDIT INSPECTOR ================= -->
+          <div v-show="inspectorTab === 'image_edit'" class="space-y-4">
+            <!-- Verdict Banner -->
+            <div class="p-4 rounded-xl border flex flex-wrap items-center justify-between gap-3 shadow-sm"
+                 :class="activeInspectorResult.image_edit?.supported ? (isDarkMode ? 'bg-emerald-950/40 border-emerald-800 text-emerald-300' : 'bg-emerald-50 border-emerald-300 text-emerald-900') : (isDarkMode ? 'bg-rose-950/40 border-rose-800 text-rose-300' : 'bg-rose-50 border-rose-300 text-rose-900')">
+              <div class="flex items-center space-x-3">
+                <div class="text-2xl">{{ activeInspectorResult.image_edit?.supported ? '🟢' : '🔴' }}</div>
+                <div>
+                  <h4 class="font-bold text-sm sm:text-base">
+                    {{ activeInspectorResult.image_edit?.supported ? '模型准确支持 OpenAI /images/edits 图片编辑接口' : '图片编辑失败或模型不支持 edits' }}
+                  </h4>
+                  <p class="text-[11px] opacity-80 mt-0.5">
+                    响应耗时: {{ formatDuration(activeInspectorResult.image_edit?.latency) }} · 规格: {{ activeInspectorResult.image_edit?.size || '1024x1024' }} · 结论: {{ activeInspectorResult.image_edit?.detail || activeInspectorResult.image_edit?.error }}
+                  </p>
+                  <p v-if="activeInspectorResult.network?.image_edit?.timedOut" class="text-[11px] font-bold mt-1">
+                    ⏱ 本次图片编辑请求超时（阈值 {{ activeInspectorResult.network.image_edit.timeoutLabel }}），未在规定时间内返回。
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Comparison Area -->
+            <div class="p-3.5 rounded-xl border space-y-3"
+                 :class="isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-100 border-slate-200'">
+              <div class="flex items-center justify-between text-xs font-bold text-slate-400">
+                <span>编辑前后图像视觉比对 (Before & After):</span>
+                <span class="text-[10px] text-rose-400 font-mono">底图: image/example.jpg</span>
+              </div>
+
+              <div class="flex flex-col sm:flex-row items-center justify-center gap-4 py-2">
+                <!-- Original Image -->
+                <div class="flex flex-col items-center space-y-1.5">
+                  <div class="text-[11px] text-slate-400 font-bold">编辑参考原图 (Before)</div>
+                  <img :src="activeInspectorResult.image_edit?.originalImageUrl || 'image/example.jpg'" 
+                       class="h-44 w-auto rounded-xl object-contain border border-slate-700 shadow-md cursor-pointer hover:scale-105 transition"
+                       @click="openLightbox(activeInspectorResult.image_edit?.originalImageUrl || 'image/example.jpg', '编辑参考原图', 'image/example.jpg')"
+                       title="点击放大查看原图" />
+                </div>
+
+                <div class="text-xl text-slate-500 font-bold hidden sm:block">➔</div>
+
+                <!-- Edited Result -->
+                <div class="flex flex-col items-center space-y-1.5">
+                  <div class="text-[11px] text-emerald-400 font-bold">模型编辑输出 (After)</div>
+                  <img v-if="activeInspectorResult.image_edit?.imageUrl" 
+                       :src="activeInspectorResult.image_edit.imageUrl" 
+                       class="h-44 w-auto rounded-xl object-contain border border-emerald-500/40 shadow-md cursor-pointer hover:scale-105 transition"
+                       @click="openLightbox(activeInspectorResult.image_edit.imageUrl, activeInspectorResult.model + ' 编辑结果', activeInspectorResult.image_edit.prompt)"
+                       title="点击放大查看编辑图" />
+                  <div v-else class="h-44 w-44 rounded-xl border border-dashed flex flex-col items-center justify-center text-slate-500 text-xs p-3 text-center"
+                       :class="isDarkMode ? 'border-slate-800 bg-slate-950/40' : 'border-slate-300 bg-white'">
+                    <span>编辑失败</span>
+                    <span class="text-[10px] text-rose-400 mt-1">{{ activeInspectorResult.image_edit?.error }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Prompt Box -->
+              <div class="space-y-1 pt-2 border-t" :class="isDarkMode ? 'border-slate-800' : 'border-slate-200'">
+                <div class="text-xs font-bold text-slate-400">编辑需求提示词 (Edit Prompt):</div>
+                <div class="p-2.5 rounded-lg border text-xs font-mono whitespace-pre-wrap leading-relaxed"
+                     :class="isDarkMode ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-300 text-slate-800'">
+                  {{ activeInspectorResult.image_edit?.prompt }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Traffic Toolbar -->
+            <div class="flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl border transition-colors"
+                 :class="isDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-slate-100 border-slate-200'">
+              <div class="flex items-center space-x-1 text-xs">
+                <button @click="activeTrafficSubTab = 'split'"
+                        class="px-2.5 py-1 rounded-lg font-medium transition"
+                        :class="activeTrafficSubTab === 'split' ? 'bg-rose-600 text-white shadow' : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')">
+                  ⫤⊨ 并排对比
+                </button>
+                <button @click="activeTrafficSubTab = 'request'"
+                        class="px-2.5 py-1 rounded-lg font-medium transition"
+                        :class="activeTrafficSubTab === 'request' ? 'bg-rose-600 text-white shadow' : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')">
+                  📤 完整请求
+                </button>
+                <button @click="activeTrafficSubTab = 'response'"
+                        class="px-2.5 py-1 rounded-lg font-medium transition"
+                        :class="activeTrafficSubTab === 'response' ? 'bg-rose-600 text-white shadow' : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')">
+                  📥 完整返回
+                </button>
+                <button @click="activeTrafficSubTab = 'curl'"
+                        class="px-2.5 py-1 rounded-lg font-medium transition"
+                        :class="activeTrafficSubTab === 'curl' ? 'bg-rose-600 text-white shadow' : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')">
+                  💻 cURL 命令行
+                </button>
+              </div>
+
+              <div class="flex items-center space-x-1.5 text-xs">
+                <button @click="copyPayload(activeInspectorResult.network?.image_edit?.requestBody, '已复制图片编辑请求参数摘要')"
+                        class="px-2 py-1 rounded-lg border transition text-[11px] font-mono hover:text-rose-400"
+                        :class="isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-300 text-slate-700'">
+                  📋 复制请求
+                </button>
+                <button @click="copyPayload(activeInspectorResult.network?.image_edit?.responseBody, '已复制图片编辑返回 JSON')"
+                        class="px-2 py-1 rounded-lg border transition text-[11px] font-mono hover:text-rose-400"
+                        :class="isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-300 text-slate-700'">
+                  📥 复制返回
+                </button>
+                <button @click="copyCurlCommand(activeInspectorResult.network?.image_edit)"
+                        class="px-2 py-1 rounded-lg border transition text-[11px] font-mono hover:text-rose-400"
+                        :class="isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-300 text-slate-700'">
+                  💻 复制 cURL
+                </button>
+              </div>
+            </div>
+
+            <!-- Traffic Panel Body -->
+            <div class="rounded-xl border p-3 font-mono text-xs overflow-hidden"
+                 :class="isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'">
+              <div v-if="activeTrafficSubTab === 'split'" class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div class="space-y-1">
+                  <div class="text-[11px] font-bold text-slate-400 pb-1 border-b border-slate-800">请求参数 (Multipart FormData):</div>
+                  <pre class="p-2.5 rounded bg-slate-900/60 overflow-auto max-h-[360px] text-[11px] leading-relaxed">{{ safeJsonFormat(activeInspectorResult.network?.image_edit?.requestBody) }}</pre>
+                </div>
+                <div class="space-y-1">
+                  <div class="text-[11px] font-bold text-slate-400 pb-1 border-b border-slate-800">服务端响应 (Response Body):</div>
+                  <pre class="p-2.5 rounded bg-slate-900/60 overflow-auto max-h-[360px] text-[11px] leading-relaxed">{{ safeJsonFormat(activeInspectorResult.network?.image_edit?.responseBody || activeInspectorResult.network?.image_edit?.responseRaw) }}</pre>
+                </div>
+              </div>
+
+              <div v-else-if="activeTrafficSubTab === 'request'" class="space-y-1">
+                <div class="text-[11px] font-bold text-slate-400 pb-1 border-b border-slate-800">请求字段摘要:</div>
+                <pre class="p-3 rounded bg-slate-900/60 overflow-auto max-h-[460px] text-[11px] leading-relaxed">{{ safeJsonFormat(activeInspectorResult.network?.image_edit?.requestBody) }}</pre>
+              </div>
+
+              <div v-else-if="activeTrafficSubTab === 'response'" class="space-y-1">
+                <div class="text-[11px] font-bold text-slate-400 pb-1 border-b border-slate-800">完整服务端返回:</div>
+                <pre class="p-3 rounded bg-slate-900/60 overflow-auto max-h-[460px] text-[11px] leading-relaxed">{{ safeJsonFormat(activeInspectorResult.network?.image_edit?.responseBody || activeInspectorResult.network?.image_edit?.responseRaw) }}</pre>
+              </div>
+
+              <div v-else-if="activeTrafficSubTab === 'curl'" class="space-y-1">
+                <div class="text-[11px] font-bold text-slate-400 pb-1 border-b border-slate-800">终端复现 cURL 命令 (带 -F 参数):</div>
+                <pre class="p-3 rounded bg-slate-900/60 overflow-auto max-h-[460px] text-[11px] text-rose-300 leading-relaxed font-mono select-all">{{ getTrafficCurl(activeInspectorResult.network?.image_edit) }}</pre>
+              </div>
+            </div>
+          </div>
+
           <!-- ================= TAB: RAW JSON ================= -->
           <div v-if="inspectorTab === 'raw'" class="space-y-3">
             <div class="flex items-center justify-between">
@@ -2610,6 +3571,46 @@
       </div>
     </div>
 
+        <!-- Image Lightbox Modal -->
+    <div v-if="lightbox.show" 
+         class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4"
+         @click.self="closeLightbox">
+      <div class="relative max-w-5xl max-h-[92vh] flex flex-col items-center justify-center w-full">
+        <!-- Close Button -->
+        <button @click="closeLightbox" 
+                class="absolute -top-12 right-0 p-2 rounded-full bg-slate-800/80 hover:bg-slate-700 text-white transition shadow-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+
+        <!-- Image Container -->
+        <div class="rounded-2xl overflow-hidden border border-slate-700/80 shadow-2xl bg-slate-950/80 max-h-[75vh] flex items-center justify-center w-full">
+          <img :src="lightbox.url" 
+               :alt="lightbox.title || 'Image Preview'" 
+               class="max-h-[75vh] max-w-full object-contain select-none">
+        </div>
+
+        <!-- Info & Actions Strip -->
+        <div class="mt-3.5 w-full bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-2.5 flex items-center justify-between text-xs text-slate-200 shadow-lg flex-wrap gap-2">
+          <div class="min-w-0 pr-4">
+            <h4 class="font-bold font-mono text-sm truncate text-white">{{ lightbox.title }}</h4>
+            <p class="text-[11px] text-slate-400 truncate mt-0.5">{{ lightbox.subtitle }}</p>
+          </div>
+          <div class="flex items-center space-x-2 flex-shrink-0">
+            <button @click="openImageInNewTab(lightbox.url)" 
+                    class="px-2.5 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white transition flex items-center space-x-1">
+              <span>↗️</span>
+              <span>新标签页打开</span>
+            </button>
+            <button @click="downloadImageUrl(lightbox.url, `${lightbox.title || 'image'}.png`)" 
+                    class="px-3 py-1.5 rounded-lg font-bold bg-pink-600 hover:bg-pink-500 text-white transition flex items-center space-x-1 shadow-md shadow-pink-600/30">
+              <span>⬇️</span>
+              <span>下载图片</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast Notification -->
     <div v-if="toastMessage" 
          class="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl text-xs font-bold shadow-2xl transition-all duration-300 flex items-center space-x-2"
@@ -2634,7 +3635,7 @@
   <script>
     const { createApp, ref, reactive, computed, onMounted, watch } = Vue;
 
-    createApp({
+    window.__APP__ = createApp({
       setup() {
         // Theme Management
         const isDarkMode = ref(true);
@@ -2649,6 +3650,141 @@
         const showKey = ref(false);
         const showAdvanced = ref(true);
         const showHelpModal = ref(false);
+
+        // Test Mode: 'chat' (默认对话检测) | 'image' (图片生成与编辑检测)
+        const testMode = ref('chat');
+
+        // Image Generation & Editing Configuration
+        const checkImageGen = ref(true);
+        const checkImageEdit = ref(true);
+        const imageGenPrompt = ref('一只戴着复古墨镜在赛博朋克霓虹街头滑板的柴犬，电影级光影，8k高分辨率壁纸');
+        const imageGenSize = ref(''); // 默认不传，使用模型缺省尺寸
+        const imageGenQuality = ref(''); // 默认不传（避免非 DALL-E 3 模型报 quality is not supported）
+        const imageGenStyle = ref(''); // 默认不传（避免非 DALL-E 3 模型报错）
+        const imageGenResponseFormat = ref(''); // 默认不传，自适应服务端返回格式
+        const imageGenN = ref(1); // 默认 1（不显式传参，仅在 >1 时传递）
+
+        const imageEditPrompt = ref('给画面中的主体添加一副炫酷太阳镜，背景增加彩色的派对气球，高清摄影细节');
+        const imageEditSize = ref(''); // 默认不传，使用模型默认或保持底图尺寸
+        const imageEditResponseFormat = ref(''); // 默认不传，自适应
+        const imageEditN = ref(1); // 默认 1（不显式传参，仅在 >1 时传递）
+        const customEditImageBlob = ref(null);
+        const customEditImageName = ref('');
+        const customEditImagePreview = ref('');
+
+        // Image Results State
+        const imageTestResults = ref([]);
+
+        // Lightbox State
+        const lightbox = reactive({
+          show: false,
+          url: '',
+          title: '',
+          subtitle: ''
+        });
+
+        // Image Reset & Upload Helpers
+        const resetImageGenParams = () => {
+          imageGenPrompt.value = '一只戴着复古墨镜在赛博朋克霓虹街头滑板的柴犬，电影级光影，8k高分辨率壁纸';
+          imageGenSize.value = '';
+          imageGenQuality.value = '';
+          imageGenStyle.value = '';
+          imageGenResponseFormat.value = '';
+          imageGenN.value = 1;
+          showToast('生图参数已恢复精简默认（不传非常规参数）');
+        };
+
+        const resetImageEditParams = () => {
+          imageEditPrompt.value = '给画面中的主体添加一副炫酷太阳镜，背景增加彩色的派对气球，高清摄影细节';
+          imageEditSize.value = '';
+          imageEditResponseFormat.value = '';
+          imageEditN.value = 1;
+          showToast('编辑参数已恢复精简默认');
+        };
+
+        const resetToDefaultExampleImage = () => {
+          customEditImageBlob.value = null;
+          customEditImageName.value = '';
+          customEditImagePreview.value = '';
+          showToast('已重置为默认编辑底图: image/example.jpg');
+        };
+
+        const onEditImageUpload = (event) => {
+          const file = event.target.files && event.target.files[0];
+          if (!file) return;
+          if (!file.type.startsWith('image/')) {
+            showToast('请选择有效的图片文件', 'error');
+            return;
+          }
+          customEditImageBlob.value = file;
+          customEditImageName.value = file.name;
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            customEditImagePreview.value = e.target.result;
+          };
+          reader.readAsDataURL(file);
+          showToast(`已更换编辑底图为: ${file.name}`);
+        };
+
+        const b64toBlob = (b64Data, contentType = 'image/jpeg') => {
+          const byteCharacters = atob(b64Data);
+          const byteArrays = [];
+          for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+            const slice = byteCharacters.slice(offset, offset + 512);
+            const byteNumbers = new Array(slice.length);
+            for (let i = 0; i < slice.length; i++) {
+              byteNumbers[i] = slice.charCodeAt(i);
+            }
+            byteArrays.push(new Uint8Array(byteNumbers));
+          }
+          return new Blob(byteArrays, { type: contentType });
+        };
+
+        const getEffectiveEditImageBlob = async () => {
+          if (customEditImageBlob.value) {
+            return customEditImageBlob.value;
+          }
+          try {
+            const res = await fetch('image/example.jpg');
+            if (res.ok) {
+              return await res.blob();
+            }
+          } catch (err) {
+            console.warn('Direct fetch image/example.jpg failed, falling back to embedded b64', err);
+          }
+          if (window.DEFAULT_EXAMPLE_IMAGE_B64) {
+            return b64toBlob(window.DEFAULT_EXAMPLE_IMAGE_B64, 'image/jpeg');
+          }
+          throw new Error('无法加载默认编辑底图 image/example.jpg');
+        };
+
+        const openLightbox = (url, title = '', subtitle = '') => {
+          if (!url) return;
+          lightbox.url = url;
+          lightbox.title = title;
+          lightbox.subtitle = subtitle;
+          lightbox.show = true;
+        };
+
+        const closeLightbox = () => {
+          lightbox.show = false;
+        };
+
+        const downloadImageUrl = (url, filename = 'generated-image.png') => {
+          if (!url) return;
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          showToast('已开始下载图片');
+        };
+
+        const openImageInNewTab = (url) => {
+          if (!url) return;
+          window.open(url, '_blank');
+        };
 
         // Network / Feature Toggles
         const useCorsProxy = ref(false);
@@ -2668,7 +3804,8 @@
         const maxTokens = ref(65536);
         // 并发请求数：默认 1（串行）；>1 时多个请求同时进行
         const concurrency = ref(1);
-        const timeoutSeconds = ref(60); // 默认 60 秒
+        const timeoutSeconds = ref(60); // 对话默认 60 秒
+        const imageTimeoutSeconds = ref(120); // 图片生成/编辑默认 120 秒
 
         const onMaxTokensBlur = () => {
           if (maxTokens.value === '' || maxTokens.value === null || isNaN(maxTokens.value)) {
@@ -2682,6 +3819,8 @@
 
         const applyMaxTokens = (payload) => {
           if (!payload) return payload;
+          // 仅对对话补全请求（包含 messages 数组）附加 max_tokens，严禁污染图片生成/编辑等其他接口
+          if (!Array.isArray(payload.messages)) return payload;
           const val = Number(maxTokens.value);
           if (!isNaN(val) && val > 0) {
             payload.max_tokens = Math.floor(val);
@@ -2721,6 +3860,56 @@
         const finishedTaskCount = ref(0);
 
         // Results State
+                // ==============================================================================
+        // 本地存储持久化：对话结果与图片生成/编辑结果独立存储，互不干扰
+        // ==============================================================================
+        const STORAGE_KEY_CHAT_RESULTS = 'model_inspector_v3_chat_results';
+        const STORAGE_KEY_IMAGE_RESULTS = 'model_inspector_v3_image_results';
+
+        const saveChatResultsToStorage = () => {
+          try {
+            const data = JSON.stringify(testResults.value || []);
+            localStorage.setItem(STORAGE_KEY_CHAT_RESULTS, data);
+          } catch (err) {
+            console.warn('LocalStorage error saving chat results:', err);
+            try {
+              // 降级：若存储配额超限，移除 raw 流式报文并保留最近 50 条
+              const sanitized = (testResults.value || []).slice(0, 50).map(r => {
+                const copy = { ...r };
+                if (copy.raw) copy.raw = {};
+                return copy;
+              });
+              localStorage.setItem(STORAGE_KEY_CHAT_RESULTS, JSON.stringify(sanitized));
+            } catch (e) {
+              console.error('LocalStorage quota exceeded for chat results', e);
+            }
+          }
+        };
+
+        const saveImageResultsToStorage = () => {
+          try {
+            const data = JSON.stringify(imageTestResults.value || []);
+            localStorage.setItem(STORAGE_KEY_IMAGE_RESULTS, data);
+          } catch (err) {
+            console.warn('LocalStorage error saving image results:', err);
+            try {
+              // 降级：若生图返回了超大 base64，剥离持久化中的大 Base64 数据以防配额溢出
+              const sanitized = (imageTestResults.value || []).slice(0, 40).map(r => {
+                const item = JSON.parse(JSON.stringify(r));
+                ['image_gen', 'image_edit'].forEach(k => {
+                  if (item[k]?.imageUrl && item[k].imageUrl.startsWith('data:') && item[k].imageUrl.length > 50000) {
+                    item[k].imageUrl = '';
+                  }
+                });
+                return item;
+              });
+              localStorage.setItem(STORAGE_KEY_IMAGE_RESULTS, JSON.stringify(sanitized));
+            } catch (e) {
+              console.error('LocalStorage quota exceeded for image results', e);
+            }
+          }
+        };
+
         const testResults = ref([]);
         const viewMode = ref('table');
         const activeInspectorResult = ref(null);
@@ -2733,14 +3922,26 @@
 
         // Helper: Generate clean cURL command
         const generateCurl = (endpoint, headers, body) => {
-          let curl = `curl -X POST "${endpoint}" \\\n`;
+          if (!endpoint) return '';
+          let curl = `curl -X POST "${endpoint}" \
+`;
           for (const [k, v] of Object.entries(headers || {})) {
-            curl += `  -H "${k}: ${v}" \\\n`;
+            curl += `  -H "${k}: ${v}" \
+`;
           }
           if (body) {
-            curl += `  -d '${JSON.stringify(body, null, 2)}'`;
+            if (typeof body === 'string') {
+              curl += `  -d '${body}'`;
+            } else {
+              curl += `  -d '${JSON.stringify(body, null, 2)}'`;
+            }
           }
           return curl;
+        };
+
+        const getTrafficCurl = (trafficItem) => {
+          if (!trafficItem) return '';
+          return trafficItem.curl || trafficItem.customCurl || generateCurl(trafficItem.endpoint, trafficItem.headers, trafficItem.requestBody) || '';
         };
 
         const safeJsonFormat = (val) => {
@@ -2945,23 +4146,47 @@
           const d = res?.[key];
           if (!d) return true;
           if (d.error === '跳过检测' || d.error === '检测被中止，未执行') return true;
+          if (key === 'image_gen') {
+            if (d.supported || d.imageUrl || (typeof d.latency === 'number' && d.latency > 0) || res?.network?.image_gen) return false;
+            return true;
+          }
+          if (key === 'image_edit') {
+            if (d.supported || d.imageUrl || (typeof d.latency === 'number' && d.latency > 0) || res?.network?.image_edit) return false;
+            return true;
+          }
           if (!res?.network?.[key] && !d.latency && !d.replyText && !d.detail && !d.error) {
             return true;
           }
           return false;
         };
 
+        // 维度中文名称对照
+        const getDimTitle = (dimKey) => {
+          const map = {
+            chat: '对话',
+            thinking: '思考',
+            vision: '视觉',
+            tools: '工具',
+            pelican: '鹈鹕',
+            image_gen: '图片生成',
+            image_edit: '图片编辑'
+          };
+          return map[dimKey] || dimKey;
+        };
+
         // 维度状态短文案（不含耗时），耗时单独渲染
         const dimStatusText = (res, key) => {
           const d = res?.[key];
           if (!d) return '—';
-          if (isDimUntested(res, key)) return '— 未检测';
+          if (isDimUntested(res, key)) return '未检测';
           const timedOut = res.network?.[key]?.timedOut;
           if (key === 'chat') return d.supported ? '可用' : (timedOut ? '超时' : '失败');
           if (key === 'thinking') return d.supported ? '支持' : (timedOut ? '超时' : '无思考');
           if (key === 'vision') return d.supported ? '支持' : (timedOut ? '超时' : '不支持');
           if (key === 'tools') return d.supported ? '支持' : (d.simulated ? '文本模拟' : (timedOut ? '超时' : '不支持'));
           if (key === 'pelican') return d.supported ? 'SVG' : (timedOut ? '超时' : '不支持');
+          if (key === 'image_gen') return d.supported ? '成功' : (timedOut ? '超时' : '失败');
+          if (key === 'image_edit') return d.supported ? '成功' : (timedOut ? '超时' : '失败');
           return '—';
         };
 
@@ -3063,7 +4288,7 @@
 
         const copyCurlCommand = (trafficItem) => {
           if (!trafficItem) return;
-          const curl = trafficItem.curl || generateCurl(trafficItem.endpoint, trafficItem.headers, trafficItem.requestBody);
+          const curl = getTrafficCurl(trafficItem);
           copyText(curl, 'cURL 命令已复制到剪贴板，可直接在终端中粘贴调试！');
         };
 
@@ -3073,6 +4298,11 @@
         const toastType = ref('success');
 
         const quickTags = ['全部', 'GPT', 'Claude', 'DeepSeek', 'Qwen', 'Gemini', 'Llama', 'GLM'];
+        const currentQuickTags = computed(() => {
+          return testMode.value === 'image' 
+            ? ['全部', 'DALL-E', 'Flux', 'SD', 'Midjourney', 'Image', 'Recraft', 'Ideogram']
+            : ['全部', 'GPT', 'Claude', 'DeepSeek', 'Qwen', 'Gemini', 'Llama', 'GLM'];
+        });
 
         // Dynamic 64x64 valid test PNG image (Generated client-side)
         // Background: Pure Red (#EF4444), Center: Blue Circle (#3B82F6)
@@ -3098,6 +4328,8 @@
           let u = raw.trim().replace(/\/+$/, '');
           u = u.replace(/\/chat\/completions$/, '');
           u = u.replace(/\/models$/, '');
+          u = u.replace(/\/images\/generations$/, '');
+          u = u.replace(/\/images\/edits$/, '');
           if (!u.endsWith('/v1') && !u.includes('/v1/')) {
             u = u + '/v1';
           }
@@ -3141,6 +4373,16 @@
         });
 
         // Summary Counts (5 dimensions)
+        // Image Mode Summary Counts
+        const countImageGenPass = computed(() => imageTestResults.value.filter(r => r.image_gen && r.image_gen.supported).length);
+        const countImageEditPass = computed(() => imageTestResults.value.filter(r => r.image_edit && r.image_edit.supported).length);
+        const countImageDualPass = computed(() => imageTestResults.value.filter(r => r.image_gen?.supported && r.image_edit?.supported).length);
+        const avgImageLatency = computed(() => {
+          if (imageTestResults.value.length === 0) return 0;
+          const total = imageTestResults.value.reduce((acc, r) => acc + (r.totalLatency || 0), 0);
+          return Math.round(total / imageTestResults.value.length);
+        });
+
         const countVisionPass = computed(() => testResults.value.filter(r => r.vision && r.vision.supported).length);
         const countToolPass = computed(() => testResults.value.filter(r => r.tools && r.tools.supported).length);
         const countThinkingPass = computed(() => testResults.value.filter(r => r.thinking && r.thinking.supported).length);
@@ -3214,7 +4456,8 @@
         };
 
         const getTestStatus = (modelId) => {
-          const found = testResults.value.find(r => r.model === modelId);
+          const list = testMode.value === 'image' ? imageTestResults.value : testResults.value;
+          const found = list.find(r => r.model === modelId);
           return found ? 'tested' : 'untested';
         };
 
@@ -3847,7 +5090,8 @@
 
         // 单个模型当前进度摘要（并发时比显示“最后一个步骤”更直观）
         const liveRunSummary = (run) => {
-          const keys = DIM_ORDER.filter(liveDimEnabled);
+          const order = testMode.value === 'image' ? IMAGE_DIM_ORDER : DIM_ORDER;
+          const keys = order.filter(liveDimEnabled);
           if (keys.length === 0) return '无检测项';
           const running = keys.filter(k => run.status[k] === 'testing').length;
           const done = keys.filter(k => run.status[k] === 'ok' || run.status[k] === 'fail').length;
@@ -3864,6 +5108,8 @@
           if (key === 'vision') return checkVision.value;
           if (key === 'tools') return checkTools.value;
           if (key === 'pelican') return checkPelican.value;
+          if (key === 'image_gen') return checkImageGen.value;
+          if (key === 'image_edit') return checkImageEdit.value;
           return false;
         };
 
@@ -4429,6 +5675,390 @@
           return strongMarkers.some(m => lower.includes(m.toLowerCase()));
         };
 
+                // ---------------- 图片生成与编辑能力检测引擎 ----------------
+        const createImageResult = (modelId) => reactive({
+          model: modelId,
+          timestamp: new Date().toLocaleTimeString(),
+          image_gen: {
+            supported: false,
+            latency: 0,
+            imageUrl: '',
+            revisedPrompt: '',
+            prompt: '',
+            size: '',
+            detail: '',
+            error: null
+          },
+          image_edit: {
+            supported: false,
+            latency: 0,
+            imageUrl: '',
+            originalImageUrl: '',
+            prompt: '',
+            size: '',
+            detail: '',
+            error: null
+          },
+          totalLatency: 0,
+          network: {
+            image_gen: null,
+            image_edit: null
+          },
+          raw: {}
+        });
+
+        const IMAGE_DIM_ORDER = ['image_gen', 'image_edit'];
+
+        const IMAGE_LIVE_DIMS = [
+          { key: 'image_gen', label: '1. 图片生成', ok: '✓ 生成成功', fail: '✕ 失败',
+            testing: 'bg-pink-500/10 border-pink-500 text-pink-400 animate-pulse',
+            done: 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400',
+            bad: 'bg-rose-500/10 border-rose-500/40 text-rose-400' },
+          { key: 'image_edit', label: '2. 图片编辑', ok: '✓ 编辑成功', fail: '✕ 失败',
+            testing: 'bg-rose-500/10 border-rose-500 text-rose-400 animate-pulse',
+            done: 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400',
+            bad: 'bg-rose-500/10 border-rose-500/40 text-rose-400' }
+        ];
+
+        const currentLiveDims = computed(() => {
+          return testMode.value === 'image' ? IMAGE_LIVE_DIMS : LIVE_DIMS;
+        });
+
+        const runImageGenTask = async (modelId, result, ctx, run) => {
+          const endpoint = formatEndpoint('/images/generations');
+          const headers = { 'Content-Type': 'application/json' };
+          if (apiKey.value.trim()) {
+            headers['Authorization'] = `Bearer ${apiKey.value.trim()}`;
+          }
+
+          // 精简构建载荷：默认仅传核心必要的 model 与 prompt 参数，兼容所有大模型与第三方中转
+          const payload = {
+            model: modelId,
+            prompt: imageGenPrompt.value
+          };
+
+          // 仅在用户显式选定非空值时，才附加对应可选参数
+          if (imageGenSize.value && imageGenSize.value.trim()) {
+            payload.size = imageGenSize.value.trim();
+          }
+          if (Number(imageGenN.value) > 1) {
+            payload.n = Math.floor(Number(imageGenN.value));
+          }
+          if (imageGenResponseFormat.value && imageGenResponseFormat.value.trim()) {
+            payload.response_format = imageGenResponseFormat.value.trim();
+          }
+          if (imageGenQuality.value && imageGenQuality.value.trim() && imageGenQuality.value !== 'default') {
+            payload.quality = imageGenQuality.value.trim();
+          }
+          if (imageGenStyle.value && imageGenStyle.value.trim() && imageGenStyle.value !== 'default') {
+            payload.style = imageGenStyle.value.trim();
+          }
+
+          result.image_gen.size = payload.size || '默认尺寸';
+          result.image_gen.prompt = imageGenPrompt.value;
+          result.image_gen.size = payload.size;
+
+          const r = await performRequest({ endpoint, headers }, payload, (imageTimeoutSeconds.value || 120) * 1000);
+          result.image_gen.latency = r.latency;
+          result.network.image_gen = trafficOf({ endpoint, headers }, payload, r);
+
+          if (!r.res) {
+            result.image_gen.supported = false;
+            result.image_gen.error = describeFailure(r);
+            run.status.image_gen = 'fail';
+            return;
+          }
+
+          const data = parseData(r);
+          result.raw.image_gen = data || r.body.raw;
+
+          if (r.res.status < 200 || r.res.status >= 300) {
+            result.image_gen.supported = false;
+            result.image_gen.error = (data && data.error && (data.error.message || JSON.stringify(data.error))) || `HTTP ${r.res.status} ${r.res.statusText}`;
+            run.status.image_gen = 'fail';
+            return;
+          }
+
+          let imgUrl = '';
+          let revised = '';
+          if (data && Array.isArray(data.data) && data.data.length > 0) {
+            const item = data.data[0];
+            if (item.url) imgUrl = item.url;
+            else if (item.b64_json) imgUrl = item.b64_json.startsWith('data:') ? item.b64_json : `data:image/png;base64,${item.b64_json}`;
+            if (item.revised_prompt) revised = item.revised_prompt;
+          } else if (data && Array.isArray(data.images) && data.images.length > 0) {
+            const img = data.images[0];
+            if (typeof img === 'string') imgUrl = img.startsWith('http') || img.startsWith('data:') ? img : `data:image/png;base64,${img}`;
+            else if (img && img.url) imgUrl = img.url;
+          }
+
+          if (imgUrl) {
+            result.image_gen.supported = true;
+            result.image_gen.imageUrl = imgUrl;
+            result.image_gen.revisedPrompt = revised;
+            result.image_gen.detail = `成功生成图片 (${payload.size}${revised ? ' · 提示词已改写' : ''})`;
+            run.status.image_gen = 'ok';
+          } else {
+            result.image_gen.supported = false;
+            result.image_gen.error = (data && data.error && (data.error.message || JSON.stringify(data.error))) || '接口返回 200 但未包含有效的图片 URL 或 Base64 数据';
+            run.status.image_gen = 'fail';
+          }
+        };
+
+        const runImageEditTask = async (modelId, result, ctx, run) => {
+          const endpoint = formatEndpoint('/images/edits');
+          const headers = {};
+          if (apiKey.value.trim()) {
+            headers['Authorization'] = `Bearer ${apiKey.value.trim()}`;
+          }
+
+          let editBlob = null;
+          let fileName = customEditImageName.value || 'example.jpg';
+          try {
+            editBlob = await getEffectiveEditImageBlob();
+          } catch (err) {
+            result.image_edit.supported = false;
+            result.image_edit.error = `底图加载失败: ${err.message}`;
+            run.status.image_edit = 'fail';
+            return;
+          }
+
+          // 精简 FormData：默认仅传必需的 model, prompt, image
+          const formData = new FormData();
+          formData.append('model', modelId);
+          formData.append('prompt', imageEditPrompt.value);
+          formData.append('image', editBlob, fileName);
+
+          const payloadSummary = {
+            model: modelId,
+            prompt: imageEditPrompt.value,
+            image: `[文件: ${fileName}, 大小: ${Math.round(editBlob.size / 1024)} KB, 类型: ${editBlob.type || 'image/jpeg'}]`
+          };
+
+          if (imageEditSize.value && imageEditSize.value.trim()) {
+            formData.append('size', imageEditSize.value.trim());
+            payloadSummary.size = imageEditSize.value.trim();
+          }
+          if (Number(imageEditN.value) > 1) {
+            formData.append('n', String(Math.floor(Number(imageEditN.value))));
+            payloadSummary.n = Math.floor(Number(imageEditN.value));
+          }
+          if (imageEditResponseFormat.value && imageEditResponseFormat.value.trim()) {
+            formData.append('response_format', imageEditResponseFormat.value.trim());
+            payloadSummary.response_format = imageEditResponseFormat.value.trim();
+          }
+
+          result.image_edit.prompt = imageEditPrompt.value;
+          result.image_edit.size = payloadSummary.size || '默认尺寸';
+          result.image_edit.originalImageUrl = customEditImagePreview.value || 'image/example.jpg';
+
+          const startedAt = performance.now();
+          const controller = new AbortController();
+          let timedOut = false;
+          const timeoutMs = (imageTimeoutSeconds.value || 120) * 1000;
+          const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
+          const timeoutLabel = `${Math.round(timeoutMs / 100) / 10} 秒`;
+
+          let r = null;
+          try {
+            const fetchEndpoint = useCorsProxy.value && corsProxyUrl.value.trim() 
+              ? `${corsProxyUrl.value.trim().replace(/\/$/, '')}/${endpoint}` 
+              : endpoint;
+
+            const res = await fetch(fetchEndpoint, {
+              method: 'POST',
+              headers,
+              body: formData,
+              signal: controller.signal
+            });
+            clearTimeout(timer);
+            const body = await readResponseBody(res);
+            r = { res, body, latency: Math.round(performance.now() - startedAt), timedOut: false, timeoutLabel, networkError: null };
+          } catch (err) {
+            clearTimeout(timer);
+            const aborted = timedOut || err.name === 'AbortError';
+            r = {
+              res: null,
+              body: null,
+              latency: Math.round(performance.now() - startedAt),
+              timedOut: aborted,
+              timeoutLabel,
+              networkError: aborted ? null : `${err.name}: ${err.message}`
+            };
+          }
+
+          let editCurl = `curl -X POST "${endpoint}" \\
+`;
+          if (apiKey.value.trim()) {
+            editCurl += `  -H "Authorization: Bearer ${apiKey.value.trim()}" \\
+`;
+          }
+          editCurl += `  -F "model=${modelId}" \\
+`;
+          editCurl += `  -F "prompt=${imageEditPrompt.value.replace(/"/g, '\"')}" \\
+`;
+          editCurl += `  -F "image=@${fileName}"`;
+          if (imageEditSize.value && imageEditSize.value.trim()) {
+            editCurl += ` \\
+  -F "size=${imageEditSize.value.trim()}"`;
+          }
+          if (Number(imageEditN.value) > 1) {
+            editCurl += ` \\
+  -F "n=${Math.floor(Number(imageEditN.value))}"`;
+          }
+          if (imageEditResponseFormat.value && imageEditResponseFormat.value.trim()) {
+            editCurl += ` \\
+  -F "response_format=${imageEditResponseFormat.value.trim()}"`;
+          }
+
+          result.image_edit.latency = r.latency;
+          result.network.image_edit = {
+            endpoint,
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'multipart/form-data' },
+            requestBody: payloadSummary,
+            status: r.res ? r.res.status : null,
+            statusText: r.res ? r.res.statusText : null,
+            latency: r.latency,
+            hasResponse: !!r.res,
+            timedOut: r.timedOut,
+            timeoutLabel: r.timeoutLabel,
+            networkError: r.networkError,
+            responseBody: r.body ? (r.body.isJson ? r.body.parsed : r.body.raw) : null,
+            responseRaw: r.body ? r.body.raw : '',
+            curl: editCurl,
+            customCurl: editCurl
+          };
+
+          if (!r.res) {
+            result.image_edit.supported = false;
+            result.image_edit.error = describeFailure(r);
+            run.status.image_edit = 'fail';
+            return;
+          }
+
+          const data = parseData(r);
+          result.raw.image_edit = data || r.body.raw;
+
+          if (r.res.status < 200 || r.res.status >= 300) {
+            result.image_edit.supported = false;
+            result.image_edit.error = (data && data.error && (data.error.message || JSON.stringify(data.error))) || `HTTP ${r.res.status} ${r.res.statusText}`;
+            run.status.image_edit = 'fail';
+            return;
+          }
+
+          let imgUrl = '';
+          if (data && Array.isArray(data.data) && data.data.length > 0) {
+            const item = data.data[0];
+            if (item.url) imgUrl = item.url;
+            else if (item.b64_json) imgUrl = item.b64_json.startsWith('data:') ? item.b64_json : `data:image/png;base64,${item.b64_json}`;
+          } else if (data && Array.isArray(data.images) && data.images.length > 0) {
+            const img = data.images[0];
+            if (typeof img === 'string') imgUrl = img.startsWith('http') || img.startsWith('data:') ? img : `data:image/png;base64,${img}`;
+            else if (img && img.url) imgUrl = img.url;
+          }
+
+          if (imgUrl) {
+            result.image_edit.supported = true;
+            result.image_edit.imageUrl = imgUrl;
+            result.image_edit.detail = `成功基于底图完成编辑 (${result.image_edit.size})`;
+            run.status.image_edit = 'ok';
+          } else {
+            result.image_edit.supported = false;
+            result.image_edit.error = (data && data.error && (data.error.message || JSON.stringify(data.error))) || '接口返回 200 但未包含有效的编辑图片 URL 或 Base64 数据';
+            run.status.image_edit = 'fail';
+          }
+        };
+
+        const IMAGE_DIM_RUNNERS = {
+          image_gen: runImageGenTask,
+          image_edit: runImageEditTask
+        };
+
+        const runImageModels = async (modelIds) => {
+          const ctx = buildRequestContext();
+          const runs = [];
+          const tasks = [];
+
+          modelIds.forEach((modelId) => {
+            const existing = imageTestResults.value.find(r => r.model === modelId);
+            const result = createImageResult(modelId);
+            if (existing) {
+              IMAGE_DIM_ORDER.forEach((key) => {
+                if (!liveDimEnabled(key) && !isDimUntested(existing, key)) {
+                  result[key] = JSON.parse(JSON.stringify(existing[key]));
+                  if (existing.network?.[key]) {
+                    result.network[key] = JSON.parse(JSON.stringify(existing.network[key]));
+                  }
+                }
+              });
+            }
+            const run = {
+              modelId,
+              result,
+              status: { image_gen: 'pending', image_edit: 'pending' },
+              startedAt: performance.now()
+            };
+
+            IMAGE_DIM_ORDER.forEach((key) => {
+              if (!liveDimEnabled(key)) {
+                result[key].error = '跳过检测';
+                run.status[key] = 'skipped';
+                return;
+              }
+              tasks.push(async () => {
+                run.status[key] = 'testing';
+                try {
+                  await IMAGE_DIM_RUNNERS[key](modelId, result, ctx, run);
+                } finally {
+                  if (run.status[key] === 'testing') run.status[key] = 'fail';
+                  // 实时判定该模型所有生图/编辑任务是否已完成，完成后立即移动到最前面 (上新下旧)
+                  const isDone = IMAGE_DIM_ORDER.every(k => run.status[k] !== 'pending' && run.status[k] !== 'testing');
+                  if (isDone) {
+                    run.result.totalLatency = Math.round(performance.now() - run.startedAt);
+                    run.result.timestamp = new Date().toLocaleTimeString();
+                    const idx = imageTestResults.value.findIndex(r => r.model === run.modelId);
+                    if (idx !== -1) imageTestResults.value.splice(idx, 1);
+                    imageTestResults.value.unshift(run.result);
+                    saveImageResultsToStorage();
+                  }
+                }
+              });
+            });
+
+            runs.push(run);
+          });
+
+          liveRuns.value = runs;
+          totalTaskCount.value = tasks.length;
+          finishedTaskCount.value = 0;
+
+          await runTaskPool(tasks, concurrency.value, () => batchStopRequested.value);
+
+          const now = performance.now();
+          runs.forEach((run) => {
+            IMAGE_DIM_ORDER.forEach((key) => {
+              if (run.status[key] === 'pending') {
+                run.status[key] = 'fail';
+                if (!run.result[key].error) {
+                  run.result[key].error = '检测被中止，未执行';
+                }
+              }
+            });
+            run.result.totalLatency = Math.round(now - run.startedAt);
+
+            // 最新检测结果移动到最前面，上新下旧
+            const idx = imageTestResults.value.findIndex(r => r.model === run.modelId);
+            if (idx !== -1) {
+              imageTestResults.value.splice(idx, 1);
+            }
+            imageTestResults.value.unshift(run.result);
+          });
+
+          saveImageResultsToStorage();
+          return runs;
+        };
+
         const DIM_RUNNERS = {
           chat: runChatTask,
           thinking: runThinkingTask,
@@ -4468,9 +6098,20 @@
           const runs = [];
           const tasks = [];
 
-          // 每个模型只创建一个实时面板条目与结果对象
+          // 每个模型只创建一个实时面板条目与结果对象，若已有检测结果则保留未参与本次测试的维度数据
           modelIds.forEach((modelId) => {
+            const existing = testResults.value.find(r => r.model === modelId);
             const result = createResult(modelId);
+            if (existing) {
+              DIM_ORDER.forEach((key) => {
+                if (!liveDimEnabled(key) && !isDimUntested(existing, key)) {
+                  result[key] = JSON.parse(JSON.stringify(existing[key]));
+                  if (existing.network?.[key]) {
+                    result.network[key] = JSON.parse(JSON.stringify(existing.network[key]));
+                  }
+                }
+              });
+            }
             const run = {
               modelId,
               result,
@@ -4490,6 +6131,16 @@
                   await DIM_RUNNERS[key](modelId, result, ctx, run);
                 } finally {
                   if (run.status[key] === 'testing') run.status[key] = 'fail';
+                  // 实时判定该模型所有任务是否已完成，完成后立即移动到最前面 (上新下旧)
+                  const isDone = DIM_ORDER.every(k => run.status[k] !== 'pending' && run.status[k] !== 'testing');
+                  if (isDone) {
+                    run.result.totalLatency = Math.round(performance.now() - run.startedAt);
+                    run.result.timestamp = new Date().toLocaleTimeString();
+                    const idx = testResults.value.findIndex(r => r.model === run.modelId);
+                    if (idx !== -1) testResults.value.splice(idx, 1);
+                    testResults.value.unshift(run.result);
+                    saveChatResultsToStorage();
+                  }
                 }
               });
             });
@@ -4516,14 +6167,15 @@
             });
             run.result.totalLatency = Math.round(now - run.startedAt);
 
+            // 最新检测结果移动到最前面，上新下旧
             const idx = testResults.value.findIndex(r => r.model === run.modelId);
             if (idx !== -1) {
-              testResults.value[idx] = run.result;
-            } else {
-              testResults.value.unshift(run.result);
+              testResults.value.splice(idx, 1);
             }
+            testResults.value.unshift(run.result);
           });
 
+          saveChatResultsToStorage();
           return runs;
         };
 
@@ -4534,12 +6186,141 @@
           testingModelId.value = modelId;
           batchStopRequested.value = false;
           try {
-            await runModels([modelId]);
+            if (testMode.value === 'image') {
+              await runImageModels([modelId]);
+            } else {
+              await runModels([modelId]);
+            }
             showToast(`模型 ${modelId} 检测完成！`);
           } finally {
             isTesting.value = false;
             testingModelId.value = '';
             liveRuns.value = [];
+          }
+        };
+
+        // 单项重新检测：精准针对单个模型的单一维度执行重新检测，不覆盖其他已有维度结果
+        const testSingleDimension = async (modelId, dimKey) => {
+          if (!modelId || isTesting.value) return;
+          isTesting.value = true;
+          testingModelId.value = modelId;
+          batchStopRequested.value = false;
+
+          const isImageMode = IMAGE_DIM_ORDER.includes(dimKey);
+          const runner = isImageMode ? IMAGE_DIM_RUNNERS[dimKey] : DIM_RUNNERS[dimKey];
+          if (!runner) {
+            isTesting.value = false;
+            testingModelId.value = '';
+            return;
+          }
+
+          const ctx = buildRequestContext();
+
+          if (isImageMode) {
+            let result = imageTestResults.value.find(r => r.model === modelId);
+            if (!result) {
+              result = createImageResult(modelId);
+              imageTestResults.value.unshift(result);
+            }
+            // 重置要测试的该维度数据
+            result[dimKey] = {
+              supported: false,
+              latency: 0,
+              imageUrl: '',
+              revisedPrompt: '',
+              prompt: '',
+              size: '',
+              detail: '',
+              error: null
+            };
+            if (result.network) result.network[dimKey] = null;
+
+            const run = {
+              modelId,
+              result,
+              status: {
+                image_gen: dimKey === 'image_gen' ? 'pending' : (isDimUntested(result, 'image_gen') ? 'skipped' : (result.image_gen?.supported ? 'pass' : 'fail')),
+                image_edit: dimKey === 'image_edit' ? 'pending' : (isDimUntested(result, 'image_edit') ? 'skipped' : (result.image_edit?.supported ? 'pass' : 'fail'))
+              },
+              startedAt: performance.now()
+            };
+            liveRuns.value = [run];
+            totalTaskCount.value = 1;
+            finishedTaskCount.value = 0;
+
+            run.status[dimKey] = 'testing';
+            try {
+              await runner(modelId, result, ctx, run);
+              showToast(`${modelId} [${getDimTitle(dimKey)}] 单项检测完成！`);
+            } catch (e) {
+              console.error(e);
+              showToast(`检测出错: ${e.message}`, 'error');
+            } finally {
+              if (run.status[dimKey] === 'testing') run.status[dimKey] = 'fail';
+              finishedTaskCount.value = 1;
+              result.totalLatency = (result.image_gen?.latency || 0) + (result.image_edit?.latency || 0);
+              result.timestamp = new Date().toLocaleTimeString();
+              // 最新检测结果移动到最前面，上新下旧
+              const idx = imageTestResults.value.findIndex(r => r.model === modelId);
+              if (idx !== -1) {
+                imageTestResults.value.splice(idx, 1);
+              }
+              imageTestResults.value.unshift(result);
+              saveImageResultsToStorage();
+              isTesting.value = false;
+              testingModelId.value = '';
+              liveRuns.value = [];
+            }
+          } else {
+            let result = testResults.value.find(r => r.model === modelId);
+            if (!result) {
+              result = createResult(modelId);
+              testResults.value.unshift(result);
+            }
+            result[dimKey] = {
+              supported: false,
+              latency: 0,
+              detail: '',
+              error: null
+            };
+            if (result.network) result.network[dimKey] = null;
+
+            const run = {
+              modelId,
+              result,
+              status: {},
+              startedAt: performance.now()
+            };
+            DIM_ORDER.forEach(k => {
+              run.status[k] = k === dimKey ? 'pending' : (isDimUntested(result, k) ? 'skipped' : (result[k]?.supported ? 'pass' : 'fail'));
+            });
+            liveRuns.value = [run];
+            totalTaskCount.value = 1;
+            finishedTaskCount.value = 0;
+
+            run.status[dimKey] = 'testing';
+            try {
+              await runner(modelId, result, ctx, run);
+              showToast(`${modelId} [${getDimTitle(dimKey)}] 单项检测完成！`);
+            } catch (e) {
+              console.error(e);
+              showToast(`检测出错: ${e.message}`, 'error');
+            } finally {
+              if (run.status[dimKey] === 'testing') run.status[dimKey] = 'fail';
+              finishedTaskCount.value = 1;
+              result.totalLatency = DIM_ORDER.reduce((acc, k) => acc + (result[k]?.latency || 0), 0);
+              result.timestamp = new Date().toLocaleTimeString();
+              // 最新检测结果移动到最前面，上新下旧
+              const idx = testResults.value.findIndex(r => r.model === modelId);
+              if (idx !== -1) {
+                testResults.value.splice(idx, 1);
+              }
+              testResults.value.unshift(result);
+              saveChatResultsToStorage();
+              isTesting.value = false;
+              testingModelId.value = '';
+              liveRuns.value = [];
+            }
           }
         };
 
@@ -4556,7 +6337,11 @@
           batchStopRequested.value = false;
 
           try {
-            await runModels(targets);
+            if (testMode.value === 'image') {
+              await runImageModels(targets);
+            } else {
+              await runModels(targets);
+            }
             if (batchStopRequested.value) {
               showToast('检测已由用户中止');
             } else {
@@ -4579,19 +6364,47 @@
         const openInspector = (res, tab = 'tools') => {
           if (!res) return;
           activeInspectorResult.value = res;
+          if (res.image_gen || res.image_edit) {
+            if (tab === 'tools' || tab === 'pelican' || tab === 'thinking' || tab === 'vision' || tab === 'chat') {
+              tab = res.image_gen?.supported ? 'image_gen' : (res.image_edit?.supported ? 'image_edit' : 'image_gen');
+            }
+          }
           inspectorTab.value = tab;
           activeTrafficSubTab.value = 'split';
           showRawStream.value = false; // 打开弹窗默认展示合并后的完整 JSON
         };
 
         const clearResults = () => {
-          if (confirm('确定清空所有已检测结果吗？')) {
-            testResults.value = [];
-            showToast('已清空记录');
+          const modeName = testMode.value === 'image' ? '图片生成与编辑' : '对话';
+          if (confirm(`确定清空当前【${modeName}】的所有已检测结果吗？`)) {
+            if (testMode.value === 'image') {
+              imageTestResults.value = [];
+              localStorage.removeItem(STORAGE_KEY_IMAGE_RESULTS);
+            } else {
+              testResults.value = [];
+              localStorage.removeItem(STORAGE_KEY_CHAT_RESULTS);
+            }
+            showToast(`已清空${modeName}检测记录`);
           }
         };
 
         const exportMarkdown = () => {
+          if (testMode.value === 'image') {
+            if (imageTestResults.value.length === 0) return;
+            let md = `# AI 图片生成与编辑模型能力检测报告\n\n`;
+            md += `> **Base URL**: \`${baseUrl.value}\`\n`;
+            md += `> **检测时间**: ${new Date().toLocaleString()}\n`;
+            md += `> **总检测数**: ${imageTestResults.value.length} (生图支持: ${countImageGenPass.value}, 编辑支持: ${countImageEditPass.value}, 双项全能: ${countImageDualPass.value})\n\n`;
+            md += `| 模型名称 (Model) | 图片生成 (/images/generations) | 图片编辑 (/images/edits) | 总耗时 |\n`;
+            md += `| :--- | :---: | :---: | :---: |\n`;
+            imageTestResults.value.forEach(r => {
+              const genStr = r.image_gen?.supported ? `✅ 成功 (${formatDuration(r.image_gen.latency)})` : (r.image_gen?.latency ? `❌ 失败 (${formatDuration(r.image_gen.latency)})` : '-');
+              const editStr = r.image_edit?.supported ? `✅ 成功 (${formatDuration(r.image_edit.latency)})` : (r.image_edit?.latency ? `❌ 失败 (${formatDuration(r.image_edit.latency)})` : '-');
+              md += `| **${r.model}** | ${genStr} | ${editStr} | ${formatDuration(r.totalLatency)} |\n`;
+            });
+            copyText(md, '图片模型诊断报告已复制到剪贴板！');
+            return;
+          }
           if (testResults.value.length === 0) return;
           let md = `# AI 模型能力深度检测报告\n\n`;
           md += `> **Base URL**: \`${baseUrl.value}\`\n`;
@@ -4621,6 +6434,187 @@
         };
 
         const loadDemoResults = () => {
+          if (testMode.value === 'image') {
+            imageTestResults.value = [
+              {
+                model: 'dall-e-3',
+                timestamp: new Date().toLocaleTimeString(),
+                totalLatency: 4420,
+                image_gen: {
+                  supported: true,
+                  latency: 4120,
+                  imageUrl: 'image/example.jpg',
+                  revisedPrompt: 'A stylish and cute shiba inu puppy wearing vintage sunglasses, skateboarding along a neon-lit cyberpunk city street at sunset, 8k resolution, cinematic lighting.',
+                  prompt: imageGenPrompt.value,
+                  size: '1024x1024',
+                  detail: '成功生成 1024x1024 高清图片 (带 Prompt 改写)',
+                  error: null
+                },
+                image_edit: {
+                  supported: false,
+                  latency: 300,
+                  imageUrl: '',
+                  originalImageUrl: 'image/example.jpg',
+                  prompt: imageEditPrompt.value,
+                  size: '1024x1024',
+                  detail: '',
+                  error: "The model 'dall-e-3' does not support the /images/edits endpoint. Please use 'dall-e-2'."
+                },
+                network: {
+                  image_gen: {
+                    endpoint: 'https://api.openai.com/v1/images/generations',
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer sk-proj-demo-token-12345678' },
+                    requestBody: { model: 'dall-e-3', prompt: imageGenPrompt.value, n: 1, size: '1024x1024', quality: 'standard', style: 'vivid', response_format: 'url' },
+                    status: 200,
+                    statusText: 'OK',
+                    latency: 4120,
+                    hasResponse: true,
+                    timedOut: false,
+                    timeoutLabel: null,
+                    networkError: null,
+                    responseBody: { created: 1729738200, data: [{ url: 'image/example.jpg', revised_prompt: 'A stylish and cute shiba inu puppy wearing vintage sunglasses...' }] },
+                    responseRaw: JSON.stringify({ created: 1729738200, data: [{ url: 'image/example.jpg', revised_prompt: 'A stylish and cute shiba inu puppy wearing vintage sunglasses...' }] }, null, 2)
+                  },
+                  image_edit: {
+                    endpoint: 'https://api.openai.com/v1/images/edits',
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer sk-proj-demo-token-12345678', 'Content-Type': 'multipart/form-data' },
+                    requestBody: { model: 'dall-e-3', prompt: imageEditPrompt.value, n: 1, size: '1024x1024', response_format: 'url', image: '[文件: example.jpg, 大小: 48 KB]' },
+                    status: 400,
+                    statusText: 'Bad Request',
+                    latency: 300,
+                    hasResponse: true,
+                    timedOut: false,
+                    timeoutLabel: null,
+                    networkError: null,
+                    responseBody: { error: { message: "The model 'dall-e-3' does not support the /images/edits endpoint. Please use 'dall-e-2'.", type: 'invalid_request_error', param: 'model', code: null } },
+                    responseRaw: JSON.stringify({ error: { message: "The model 'dall-e-3' does not support the /images/edits endpoint. Please use 'dall-e-2'.", type: 'invalid_request_error', param: 'model', code: null } }, null, 2)
+                  }
+                },
+                raw: {}
+              },
+              {
+                model: 'dall-e-2',
+                timestamp: new Date().toLocaleTimeString(),
+                totalLatency: 5750,
+                image_gen: {
+                  supported: true,
+                  latency: 2280,
+                  imageUrl: 'image/example.jpg',
+                  revisedPrompt: '',
+                  prompt: imageGenPrompt.value,
+                  size: '1024x1024',
+                  detail: '成功生成 1024x1024 标准图片',
+                  error: null
+                },
+                image_edit: {
+                  supported: true,
+                  latency: 3470,
+                  imageUrl: 'image/example.jpg',
+                  originalImageUrl: 'image/example.jpg',
+                  prompt: imageEditPrompt.value,
+                  size: '1024x1024',
+                  detail: '成功完成基于 example.jpg 的全图与局部编辑',
+                  error: null
+                },
+                network: {
+                  image_gen: {
+                    endpoint: 'https://api.openai.com/v1/images/generations',
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer sk-proj-demo-token-12345678' },
+                    requestBody: { model: 'dall-e-2', prompt: imageGenPrompt.value, n: 1, size: '1024x1024', response_format: 'url' },
+                    status: 200,
+                    statusText: 'OK',
+                    latency: 2280,
+                    hasResponse: true,
+                    timedOut: false,
+                    timeoutLabel: null,
+                    networkError: null,
+                    responseBody: { created: 1729738220, data: [{ url: 'image/example.jpg' }] },
+                    responseRaw: JSON.stringify({ created: 1729738220, data: [{ url: 'image/example.jpg' }] }, null, 2)
+                  },
+                  image_edit: {
+                    endpoint: 'https://api.openai.com/v1/images/edits',
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer sk-proj-demo-token-12345678', 'Content-Type': 'multipart/form-data' },
+                    requestBody: { model: 'dall-e-2', prompt: imageEditPrompt.value, n: 1, size: '1024x1024', response_format: 'url', image: '[文件: example.jpg, 大小: 48 KB]' },
+                    status: 200,
+                    statusText: 'OK',
+                    latency: 3470,
+                    hasResponse: true,
+                    timedOut: false,
+                    timeoutLabel: null,
+                    networkError: null,
+                    responseBody: { created: 1729738230, data: [{ url: 'image/example.jpg' }] },
+                    responseRaw: JSON.stringify({ created: 1729738230, data: [{ url: 'image/example.jpg' }] }, null, 2)
+                  }
+                },
+                raw: {}
+              },
+              {
+                model: 'flux-1.1-pro',
+                timestamp: new Date().toLocaleTimeString(),
+                totalLatency: 6200,
+                image_gen: {
+                  supported: true,
+                  latency: 3150,
+                  imageUrl: 'image/example.jpg',
+                  revisedPrompt: '',
+                  prompt: imageGenPrompt.value,
+                  size: '1024x1024',
+                  detail: '成功生成 1024x1024 电影级超高清画质',
+                  error: null
+                },
+                image_edit: {
+                  supported: true,
+                  latency: 3050,
+                  imageUrl: 'image/example.jpg',
+                  originalImageUrl: 'image/example.jpg',
+                  prompt: imageEditPrompt.value,
+                  size: '1024x1024',
+                  detail: '成功完成 Flux 图像重绘与物体合成编辑',
+                  error: null
+                },
+                network: {
+                  image_gen: {
+                    endpoint: 'https://api.openai.com/v1/images/generations',
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer sk-proj-demo-token-12345678' },
+                    requestBody: { model: 'flux-1.1-pro', prompt: imageGenPrompt.value, n: 1, size: '1024x1024', response_format: 'url' },
+                    status: 200,
+                    statusText: 'OK',
+                    latency: 3150,
+                    hasResponse: true,
+                    timedOut: false,
+                    timeoutLabel: null,
+                    networkError: null,
+                    responseBody: { created: 1729738240, data: [{ url: 'image/example.jpg' }] },
+                    responseRaw: JSON.stringify({ created: 1729738240, data: [{ url: 'image/example.jpg' }] }, null, 2)
+                  },
+                  image_edit: {
+                    endpoint: 'https://api.openai.com/v1/images/edits',
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer sk-proj-demo-token-12345678', 'Content-Type': 'multipart/form-data' },
+                    requestBody: { model: 'flux-1.1-pro', prompt: imageEditPrompt.value, n: 1, size: '1024x1024', response_format: 'url', image: '[文件: example.jpg, 大小: 48 KB]' },
+                    status: 200,
+                    statusText: 'OK',
+                    latency: 3050,
+                    hasResponse: true,
+                    timedOut: false,
+                    timeoutLabel: null,
+                    networkError: null,
+                    responseBody: { created: 1729738250, data: [{ url: 'image/example.jpg' }] },
+                    responseRaw: JSON.stringify({ created: 1729738250, data: [{ url: 'image/example.jpg' }] }, null, 2)
+                  }
+                },
+                raw: {}
+              }
+            ];
+            saveImageResultsToStorage();
+            showToast('已载入图片生成与编辑 (DALL-E / Flux) 场景对比演示数据！');
+            return;
+          }
           const dummyEndpoint = 'https://api.openai.com/v1/chat/completions';
           const dummyHeaders = { 'Content-Type': 'application/json', 'Authorization': 'Bearer sk-proj-demo-token-12345678' };
 
@@ -4827,6 +6821,7 @@
               }
             }
           ];
+          saveChatResultsToStorage();
           showToast('已载入真实场景对比演示数据！包含深度思考链与鹈鹕 SVG 动画');
         };
 
@@ -4849,11 +6844,50 @@
         watch(maxTokens, (v) => localStorage.setItem('model_inspector_max_tokens', String(v ?? '')));
         watch(concurrency, (v) => localStorage.setItem('model_inspector_concurrency', String(v)));
         watch(timeoutSeconds, (v) => localStorage.setItem('model_inspector_timeout_seconds', String(v)));
+        watch(imageTimeoutSeconds, (v) => localStorage.setItem('model_inspector_image_timeout_seconds', String(v)));
         watch(showAdvanced, (v) => localStorage.setItem('model_inspector_show_advanced', v ? '1' : '0'));
+        watch(testMode, (v) => localStorage.setItem('model_inspector_test_mode', v));
+        watch(checkImageGen, (v) => localStorage.setItem('model_inspector_check_image_gen', v ? '1' : '0'));
+        watch(checkImageEdit, (v) => localStorage.setItem('model_inspector_check_image_edit', v ? '1' : '0'));
+        watch(imageGenPrompt, (v) => localStorage.setItem('model_inspector_image_gen_prompt', v));
+        watch(imageGenSize, (v) => localStorage.setItem('model_inspector_image_gen_size', v));
+        watch(imageGenQuality, (v) => localStorage.setItem('model_inspector_image_gen_quality', v));
+        watch(imageGenStyle, (v) => localStorage.setItem('model_inspector_image_gen_style', v));
+        watch(imageGenResponseFormat, (v) => localStorage.setItem('model_inspector_image_gen_response_format', v));
+        watch(imageGenN, (v) => localStorage.setItem('model_inspector_image_gen_n', String(v)));
+        watch(imageEditPrompt, (v) => localStorage.setItem('model_inspector_image_edit_prompt', v));
+        watch(imageEditSize, (v) => localStorage.setItem('model_inspector_image_edit_size', v));
+        watch(imageEditResponseFormat, (v) => localStorage.setItem('model_inspector_image_edit_response_format', v));
+        watch(imageEditN, (v) => localStorage.setItem('model_inspector_image_edit_n', String(v)));
 
         // 页面挂载 / 刷新执行
         onMounted(() => {
           testImageDataUrl.value = generateTestCanvasImage();
+
+          // 读取本地存储的历史检测结果 (对话与图片生成/编辑独立隔离存储)
+          try {
+            const savedChat = localStorage.getItem(STORAGE_KEY_CHAT_RESULTS);
+            if (savedChat) {
+              const parsed = JSON.parse(savedChat);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                testResults.value = parsed;
+              }
+            }
+          } catch (e) {
+            console.warn('读取历史对话检测结果失败:', e);
+          }
+
+          try {
+            const savedImage = localStorage.getItem(STORAGE_KEY_IMAGE_RESULTS);
+            if (savedImage) {
+              const parsed = JSON.parse(savedImage);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                imageTestResults.value = parsed;
+              }
+            }
+          } catch (e) {
+            console.warn('读取历史图片检测结果失败:', e);
+          }
 
           // 读取本地存储配置
           const savedTheme = localStorage.getItem('model_inspector_theme');
@@ -4889,6 +6923,61 @@
             pelicanPrompt.value = sPelicanPrompt;
           }
 
+          // 读取图片检测模式与参数配置（默认对话检测，默认底图 image/example.jpg）
+          const sTestMode = localStorage.getItem('model_inspector_test_mode');
+          if (sTestMode === 'image' || sTestMode === 'chat') {
+            testMode.value = sTestMode;
+          } else {
+            testMode.value = 'chat'; // 默认是当前的对话检测
+          }
+
+          const sImageGen = localStorage.getItem('model_inspector_check_image_gen');
+          if (sImageGen !== null) checkImageGen.value = sImageGen === '1';
+
+          const sImageEdit = localStorage.getItem('model_inspector_check_image_edit');
+          if (sImageEdit !== null) checkImageEdit.value = sImageEdit === '1';
+
+          // 清理旧版本可能在本地缓存的 standard/vivid 参数，确保默认不传非常规参数
+          if (localStorage.getItem('model_inspector_v3_clean_image_defaults') !== '1') {
+            localStorage.removeItem('model_inspector_image_gen_quality');
+            localStorage.removeItem('model_inspector_image_gen_style');
+            localStorage.removeItem('model_inspector_image_gen_size');
+            localStorage.removeItem('model_inspector_image_gen_response_format');
+            localStorage.removeItem('model_inspector_image_edit_size');
+            localStorage.removeItem('model_inspector_image_edit_response_format');
+            localStorage.setItem('model_inspector_v3_clean_image_defaults', '1');
+          }
+
+          const sGenPrompt = localStorage.getItem('model_inspector_image_gen_prompt');
+          if (sGenPrompt) imageGenPrompt.value = sGenPrompt;
+
+          const sGenSize = localStorage.getItem('model_inspector_image_gen_size');
+          if (sGenSize !== null) imageGenSize.value = sGenSize;
+
+          const sGenQuality = localStorage.getItem('model_inspector_image_gen_quality');
+          if (sGenQuality !== null) imageGenQuality.value = sGenQuality;
+
+          const sGenStyle = localStorage.getItem('model_inspector_image_gen_style');
+          if (sGenStyle !== null) imageGenStyle.value = sGenStyle;
+
+          const sGenFormat = localStorage.getItem('model_inspector_image_gen_response_format');
+          if (sGenFormat !== null) imageGenResponseFormat.value = sGenFormat;
+
+          const sGenN = localStorage.getItem('model_inspector_image_gen_n');
+          if (sGenN) imageGenN.value = Number(sGenN) || 1;
+
+          const sEditPrompt = localStorage.getItem('model_inspector_image_edit_prompt');
+          if (sEditPrompt) imageEditPrompt.value = sEditPrompt;
+
+          const sEditSize = localStorage.getItem('model_inspector_image_edit_size');
+          if (sEditSize !== null) imageEditSize.value = sEditSize;
+
+          const sEditFormat = localStorage.getItem('model_inspector_image_edit_response_format');
+          if (sEditFormat !== null) imageEditResponseFormat.value = sEditFormat;
+
+          const sEditN = localStorage.getItem('model_inspector_image_edit_n');
+          if (sEditN) imageEditN.value = Number(sEditN) || 1;
+
           const sProxy = localStorage.getItem('model_inspector_use_cors_proxy');
           if (sProxy !== null) useCorsProxy.value = sProxy === '1';
 
@@ -4903,6 +6992,16 @@
             }
           } else {
             timeoutSeconds.value = 60;
+          }
+
+          const sImageTimeout = localStorage.getItem('model_inspector_image_timeout_seconds');
+          if (sImageTimeout !== null) {
+            const num = parseInt(sImageTimeout, 10);
+            if (!isNaN(num) && num >= 5 && num <= 600) {
+              imageTimeoutSeconds.value = num;
+            }
+          } else {
+            imageTimeoutSeconds.value = 120; // 图片生成/编辑默认 120 秒
           }
 
           const sEffort = localStorage.getItem('model_inspector_thinking_effort');
@@ -5025,6 +7124,7 @@
           loadSamplePelicanCode,
           pasteFromClipboard,
           timeoutSeconds,
+          imageTimeoutSeconds,
           loadingModels,
           modelList,
           modelSearchQuery,
@@ -5037,7 +7137,7 @@
           isTesting,
           testingModelId,
           liveRuns,
-          liveDims: LIVE_DIMS,
+          liveDims: currentLiveDims,
           totalTaskCount,
           finishedTaskCount,
           liveDimClass,
@@ -5057,6 +7157,8 @@
           safeJsonFormat,
           copyPayload,
           copyCurlCommand,
+          generateCurl,
+          getTrafficCurl,
           alertMessage,
           toastMessage,
           toastType,
@@ -5091,7 +7193,43 @@
           clearResults,
           exportMarkdown,
           copyText,
-          loadDemoResults
+          loadDemoResults,
+          testMode,
+          checkImageGen,
+          checkImageEdit,
+          imageGenPrompt,
+          imageGenSize,
+          imageGenQuality,
+          imageGenStyle,
+          imageGenResponseFormat,
+          imageGenN,
+          imageEditPrompt,
+          imageEditSize,
+          imageEditResponseFormat,
+          imageEditN,
+          customEditImageBlob,
+          customEditImageName,
+          customEditImagePreview,
+          imageTestResults,
+          currentQuickTags,
+          countImageGenPass,
+          countImageEditPass,
+          countImageDualPass,
+          avgImageLatency,
+          lightbox,
+          resetImageGenParams,
+          resetImageEditParams,
+          resetToDefaultExampleImage,
+          onEditImageUpload,
+          openLightbox,
+          closeLightbox,
+          downloadImageUrl,
+          openImageInNewTab,
+          testSingleDimension,
+          getDimTitle,
+          isDimUntested,
+          saveChatResultsToStorage,
+          saveImageResultsToStorage
         };
       }
     }).mount('#app');
