@@ -38,7 +38,22 @@ OpenAI 兼容接口模型能力检测工具，**100% 纯前端浏览器直接运
      - **单项重新检测**：
        - 表格每行右侧操作栏提供清晰的「↻ 重测」按钮，支持对单个模型重新检测所有当前选中的项目；
        - 未检测维度药丸胶囊支持点击直接发起该单一维度的精准检测与增量更新，不覆盖该模型其他已通过的维度数据。
-2. **📦 静态资源完全本地化 (100% Offline-Ready)**：
+2. **🎯 整合 LM-Detector 模型指纹识别 (深度识别 API 真实模型)**：
+   - **背景**：中转站或第三方 API 常声称提供某个顶级模型，实际底层可能被降级或偷换成廉价模型。
+   - **原理**：整合 [Ikaleio/lm-detector](https://github.com/Ikaleio/lm-detector) 模型指纹检测算法。让模型凭第一反应写出 300 个 1–355 之间的无语义整数，通过整数频率分布（Hellinger 空间）、有序分块特征、马尔可夫转移矩阵以及一阶自相关性，与参考样本库进行 LDA 投影与闭集温度校准比对。
+   - **基础连通检测联动**：
+     - 勾选「连通/指纹 (Chat)」后，自动向模型发送指纹探针提示词（支持在侧边栏「🎲 随机换题」与「↺ 恢复默认」自定义编辑）。
+     - 只要模型接口连通并返回回答，基础对话即判定通过；同时自动运行纯前端指纹提取与评分计算。
+     - **模型可能性排行**：在表格气泡与卡片视图中实时标注最匹配的真实模型及置信度（如 `Claude 3.5 Sonnet (98.2%)` 或 `gpt-4o (96.8%)`）。
+     - **全维度指纹诊断抽屉**：点击对话气泡即可弹出查看：
+       - 🎯 **最可能匹配模型** 与相对置信度；
+       - 📊 **62 款主流模型可能性完整排行**（前 5 项高亮对比、一键展开全量模型、动画置信度进度条、分值统计）；
+       - 🔬 **伪随机序列统计诊断**（Lag-1 一阶自相关性、小步长变化占比、模型伪随机特征吻合度）；
+       - 📜 **完整请求报文与模型原始回复**。
+3. **🐍 Python 一键更新样本库与提示词 (最简实现)**：
+   - 提供根目录轻量脚本 [`update_detector_data.py`](file:///D:/work/web_projects/model_check/update_detector_data.py)，**无需安装任何额外第三方依赖包**（基于 Python 3 标准库，无 numpy / requests 依赖）。
+   - 运行 `python update_detector_data.py` 即可自动从 upstream GitHub 仓库同步最新多语言提示词模板、参考样本库与检测器权重，自动生成前端离线 Base64 模块 `js/lm_detector_data.js`，刷新浏览器即刻生效！
+4. **📦 静态资源完全本地化 (100% Offline-Ready)**：
    - 使用 `image/favicon.png` 作为网站标准 Favicon 与导航栏品牌图标。
    - 所有依赖的 JS 库（`Tailwind CSS`、`Vue 3`、`Canvas Confetti`）已全部下载至本地 `js/` 目录。
    - 依赖的英文字体（`Plus Jakarta Sans` 与 `JetBrains Mono`）及 WOFF2 字体包已全部本地化至 `fonts/` 与 `css/fonts.css`，彻底解除对外部 Google Fonts 与公共 CDN 的依赖。
@@ -82,19 +97,22 @@ OpenAI 兼容接口模型能力检测工具，**100% 纯前端浏览器直接运
 
 ```text
 model_check/
-├── index.html        # 核心主页面（零后台、纯静态直接双击运行）
-├── README.md         # 项目说明文档
+├── index.html                # 核心主页面（零后台、纯静态直接双击运行）
+├── update_detector_data.py   # LM-Detector 提示词与样本库一键同步脚本 (Python 最简实现)
+├── README.md                 # 项目说明文档
 ├── image/
-│   ├── favicon.png   # 站点 Favicon 与 Logo 图标
-│   └── example.jpg   # 图片编辑基准测试默认底图
+│   ├── favicon.png           # 站点 Favicon 与 Logo 图标
+│   └── example.jpg           # 图片编辑基准测试默认底图
 ├── css/
-│   └── fonts.css     # 本地字体样式定义
-├── fonts/            # 本地 WOFF2 字体文件库（无需外网加载 Google Fonts）
-└── js/               # 本地第三方依赖库
-    ├── tailwindcss.js           # Tailwind CSS 浏览器运行时
-    ├── vue.global.prod.min.js    # Vue 3 核心生产构建
-    ├── confetti.browser.min.js   # 庆祝礼花动效
-    └── default_example_image.js  # example.jpg 离线 Base64 安全加载兜底
+│   └── fonts.css             # 本地字体样式定义
+├── fonts/                    # 本地 WOFF2 字体文件库（无需外网加载 Google Fonts）
+└── js/                       # 本地第三方依赖与指纹检测库
+    ├── lm_detector.js        # LM-Detector 纯前端推理引擎 (特征提取、打分排序、闭集校准)
+    ├── lm_detector_data.js   # 提示词模板、62款主流模型样本库与权重 (离线免跨域 Base64)
+    ├── tailwindcss.js        # Tailwind CSS 浏览器运行时
+    ├── vue.global.prod.min.js # Vue 3 核心生产构建
+    ├── confetti.browser.min.js # 庆祝礼花动效
+    └── default_example_image.js # example.jpg 离线 Base64 安全加载兜底
 ```
 
 ---

@@ -35,4 +35,5 @@ build/
 # Temporary files
 tmp/
 temp/
+scratch/
 *.tmp
