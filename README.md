@@ -52,7 +52,7 @@ OpenAI 兼容接口模型能力检测工具，**100% 纯前端浏览器直接运
        - 📜 **完整请求报文与模型原始回复**。
 3. **🐍 Python 一键更新样本库与提示词 (最简实现)**：
    - 提供根目录轻量脚本 [`update_detector_data.py`](file:///D:/work/web_projects/model_check/update_detector_data.py)，**无需安装任何额外第三方依赖包**（基于 Python 3 标准库，无 numpy / requests 依赖）。
-   - 运行 `python update_detector_data.py` 即可自动从 upstream GitHub 仓库同步最新多语言提示词模板、参考样本库与检测器权重，自动生成前端离线 Base64 模块 `js/lm_detector_data.js`，刷新浏览器即刻生效！
+   - 运行 `python update_detector_data.py` 即可自动从 upstream GitHub 仓库同步最新多语言提示词模板、参考样本库与检测器权重，自动生成前端离线 Base64 模块 `js/lm_detector_data.js`，并自动为 `index.html` 写入防缓存版本号（如 `?v=20261027_050250`），刷新浏览器即刻生效！
 4. **📦 静态资源完全本地化 (100% Offline-Ready)**：
    - 使用 `image/favicon.png` 作为网站标准 Favicon 与导航栏品牌图标。
    - 所有依赖的 JS 库（`Tailwind CSS`、`Vue 3`、`Canvas Confetti`）已全部下载至本地 `js/` 目录。

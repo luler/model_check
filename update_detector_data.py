@@ -4,16 +4,18 @@
 LM-Detector 提示词与样本库一键同步更新脚本
 该脚本从 https://github.com/Ikaleio/lm-detector 获取最新的模型指纹提示词模板、
 参考模型库 (unified_bank) 和检测器权重 (shared_detector.bin)，并生成纯前端离线
-直接可用的 js/lm_detector_data.js 静态文件。
+直接可用的 js/lm_detector_data.js 静态文件，同时自动为 index.html 增加版本号以防浏览器强缓存。
 """
 
 import os
 import sys
+import re
 import json
 import base64
 import urllib.request
 import urllib.error
 import argparse
+from datetime import datetime
 from pathlib import Path
 
 # 确保在 Windows 控制台环境下输出 UTF-8
@@ -85,10 +87,42 @@ def load_data_from_remote():
             continue
     raise RuntimeError(f"所有网络源均获取失败，最后错误: {last_err}")
 
+def format_version_tag(built_at: str) -> str:
+    """从 built_at 时间提取精简易读的版本标识 (如 20261027_050250)"""
+    if built_at:
+        clean = re.sub(r'[^0-9a-zA-Z]', '', built_at)
+        if len(clean) >= 15 and clean[:8].isdigit():
+            return f"{clean[:8]}_{clean[9:15]}"
+        elif len(clean) >= 8 and clean[:8].isdigit():
+            return clean[:8]
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+def update_index_html(index_html_path: Path, version_tag: str):
+    """自动将 index.html 中的 lm_detector_data.js 引用增加/更新版本号，防止浏览器缓存"""
+    if not index_html_path.exists():
+        print(f"  [!] 未找到 HTML 文件: {index_html_path}，跳过版本号注入。")
+        return False
+
+    html_content = index_html_path.read_text(encoding="utf-8")
+    # 匹配 <script src="js/lm_detector_data.js"></script> 或带有 ?v=... 的标签
+    pattern = r'(<script\s+src=["\']js/lm_detector_data\.js)(?:\?[^"\']*)?(["\']\s*></script>)'
+    replacement = rf'\g<1>?v={version_tag}\g<2>'
+
+    new_html, count = re.subn(pattern, replacement, html_content)
+    if count > 0:
+        index_html_path.write_text(new_html, encoding="utf-8")
+        print(f"  ✓ 已同步更新 {index_html_path.name} 引用版本号 -> ?v={version_tag}")
+        return True
+    else:
+        print(f"  [!] 在 {index_html_path.name} 中未找到 lm_detector_data.js 引用标签，跳过。")
+        return False
+
 def main():
     parser = argparse.ArgumentParser(description="更新 LM-Detector 提示词与模型样本库到本项目")
     parser.add_argument("--source", type=str, help="指定本地 lm-detector 仓库路径进行同步（离线模式）")
     parser.add_argument("--output", type=str, default="js/lm_detector_data.js", help="输出 JS 文件路径 (默认 js/lm_detector_data.js)")
+    parser.add_argument("--html", type=str, default="index.html", help="HTML 主文件路径 (默认 index.html，更新时自动同步版本号以防缓存)")
+    parser.add_argument("--no-html-update", action="store_true", help="跳过自动更新 HTML 中的版本号")
     args = parser.parse_args()
 
     print("=" * 60)
@@ -181,8 +215,20 @@ if (typeof global !== 'undefined') {{
     output_path.write_text(js_content, encoding="utf-8")
     file_size_mb = output_path.stat().st_size / (1024 * 1024)
     print(f"✅ 成功更新并生成: {output_path} (文件大小: {file_size_mb:.2f} MB)")
+
+    # 4. 同步更新 HTML 引用版本号 (Cache Busting)
+    version_tag = format_version_tag(built_at)
+    print(f"[*] 正在检查并更新 HTML 资源引用版本号 (防浏览器强缓存)...")
+    if not args.no_html_update:
+        html_path = Path(args.html)
+        if not html_path.is_absolute():
+            html_path = Path(__file__).parent / html_path
+        update_index_html(html_path, version_tag)
+    else:
+        print("  - 已通过 --no-html-update 跳过 HTML 更新。")
+
     print("=" * 60)
-    print("🎉 恭喜！更新已完成。直接在浏览器中打开或刷新 index.html 即可使用最新指纹库！")
+    print(f"🎉 恭喜！更新已完成。index.html 已同步版本号 (?v={version_tag})，浏览器刷新即可立即加载最新指纹库！")
     print("=" * 60)
 
 if __name__ == "__main__":
