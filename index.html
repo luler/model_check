@@ -8636,99 +8636,246 @@
 
         // ==============================================================================
 
+        // ==============================================================================
+        // 浏览器持久化双轨引擎：IndexedDB (完整海量存储，无5MB限制) + LocalStorage (极速轻量同步缓存)
+        // ==============================================================================
+        const DB_NAME = 'ModelInspectorDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'results';
         const STORAGE_KEY_CHAT_RESULTS = 'model_inspector_v3_chat_results';
-
         const STORAGE_KEY_IMAGE_RESULTS = 'model_inspector_v3_image_results';
 
+        let _idbPromise = null;
+        const getInspectorDB = () => {
+          if (!_idbPromise) {
+            _idbPromise = new Promise((resolve) => {
+              if (typeof window === 'undefined' || !window.indexedDB) {
+                return resolve(null);
+              }
+              try {
+                const req = indexedDB.open(DB_NAME, DB_VERSION);
+                req.onupgradeneeded = (e) => {
+                  const db = e.target.result;
+                  if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    db.createObjectStore(STORE_NAME);
+                  }
+                };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = (e) => {
+                  console.warn('IndexedDB 打开失败，降级为 LocalStorage:', e);
+                  resolve(null);
+                };
+              } catch (e) {
+                console.warn('IndexedDB 初始化异常:', e);
+                resolve(null);
+              }
+            });
+          }
+          return _idbPromise;
+        };
 
+        const idbGet = async (key) => {
+          try {
+            const db = await getInspectorDB();
+            if (!db) return null;
+            return new Promise((resolve) => {
+              const tx = db.transaction(STORE_NAME, 'readonly');
+              const store = tx.objectStore(STORE_NAME);
+              const req = store.get(key);
+              req.onsuccess = () => resolve(req.result || null);
+              req.onerror = () => resolve(null);
+            });
+          } catch (e) {
+            return null;
+          }
+        };
+
+        const idbSet = async (key, val) => {
+          try {
+            const db = await getInspectorDB();
+            if (!db) return false;
+            return new Promise((resolve) => {
+              const tx = db.transaction(STORE_NAME, 'readwrite');
+              const store = tx.objectStore(STORE_NAME);
+              const rawData = JSON.parse(JSON.stringify(val));
+              const req = store.put(rawData, key);
+              req.onsuccess = () => resolve(true);
+              req.onerror = (err) => {
+                console.warn('idbSet 写入失败:', err);
+                resolve(false);
+              };
+            });
+          } catch (e) {
+            console.warn('idbSet 异常:', e);
+            return false;
+          }
+        };
+
+        const idbDelete = async (key) => {
+          try {
+            const db = await getInspectorDB();
+            if (!db) return false;
+            return new Promise((resolve) => {
+              const tx = db.transaction(STORE_NAME, 'readwrite');
+              const store = tx.objectStore(STORE_NAME);
+              const req = store.delete(key);
+              req.onsuccess = () => resolve(true);
+              req.onerror = () => resolve(false);
+            });
+          } catch (e) {
+            return false;
+          }
+        };
+
+        // 压缩并清理数据，生成可安全存入 LocalStorage (受5MB限制) 的轻量快照
+        const sanitizeChatForLocalStorage = (list) => {
+          if (!Array.isArray(list)) return [];
+          return list.slice(0, 50).map(r => ({
+            model: r.model,
+            timestamp: r.timestamp,
+            totalLatency: r.totalLatency,
+            chat: r.chat ? {
+              supported: r.chat.supported,
+              latency: r.chat.latency,
+              replyText: (r.chat.replyText || '').slice(0, 300),
+              reasoning: (r.chat.reasoning || '').slice(0, 300),
+              error: r.chat.error,
+              detail: r.chat.detail,
+              usage: r.chat.usage,
+              fingerprint: r.chat.fingerprint ? {
+                success: r.chat.fingerprint.success,
+                prediction: r.chat.fingerprint.prediction,
+                predictionName: r.chat.fingerprint.predictionName,
+                family: r.chat.fingerprint.family,
+                familyName: r.chat.fingerprint.familyName,
+                percent: r.chat.fingerprint.percent,
+                probability: r.chat.fingerprint.probability,
+                score: r.chat.fingerprint.score,
+                ranking: (r.chat.fingerprint.ranking || []).slice(0, 5)
+              } : null
+            } : null,
+            thinking: r.thinking ? {
+              supported: r.thinking.supported,
+              latency: r.thinking.latency,
+              replyText: (r.thinking.replyText || '').slice(0, 300),
+              reasoning: (r.thinking.reasoning || '').slice(0, 1500),
+              wordCount: r.thinking.wordCount,
+              reasoningTokens: r.thinking.reasoningTokens,
+              detail: r.thinking.detail,
+              error: r.thinking.error,
+              usage: r.thinking.usage
+            } : null,
+            vision: r.vision ? {
+              supported: r.vision.supported,
+              latency: r.vision.latency,
+              replyText: (r.vision.replyText || '').slice(0, 200),
+              detail: r.vision.detail,
+              error: r.vision.error
+            } : null,
+            tools: r.tools ? {
+              supported: r.tools.supported,
+              simulated: r.tools.simulated,
+              latency: r.tools.latency,
+              replyText: (r.tools.replyText || '').slice(0, 200),
+              detail: r.tools.detail,
+              toolCalls: r.tools.toolCalls,
+              error: r.tools.error
+            } : null,
+            pelican: r.pelican ? {
+              supported: r.pelican.supported,
+              latency: r.pelican.latency,
+              replyText: (r.pelican.replyText || '').slice(0, 300),
+              detail: r.pelican.detail,
+              htmlCode: (r.pelican.htmlCode || '').slice(0, 4000),
+              error: r.pelican.error
+            } : null,
+            network: r.network ? Object.fromEntries(
+              Object.entries(r.network).map(([k, v]) => [k, v ? {
+                endpoint: v.endpoint,
+                status: v.status,
+                statusText: v.statusText,
+                latency: v.latency,
+                timedOut: v.timedOut,
+                timeoutLabel: v.timeoutLabel,
+                networkError: v.networkError
+              } : null])
+            ) : null
+          }));
+        };
+
+        const sanitizeImageForLocalStorage = (list) => {
+          if (!Array.isArray(list)) return [];
+          return list.slice(0, 50).map(r => ({
+            model: r.model,
+            timestamp: r.timestamp,
+            totalLatency: r.totalLatency,
+            image_gen: r.image_gen ? {
+              supported: r.image_gen.supported,
+              latency: r.image_gen.latency,
+              error: r.image_gen.error,
+              prompt: r.image_gen.prompt,
+              imageUrl: (r.image_gen.imageUrl && r.image_gen.imageUrl.startsWith('http')) ? r.image_gen.imageUrl : ''
+            } : null,
+            image_edit: r.image_edit ? {
+              supported: r.image_edit.supported,
+              latency: r.image_edit.latency,
+              error: r.image_edit.error,
+              prompt: r.image_edit.prompt,
+              imageUrl: (r.image_edit.imageUrl && r.image_edit.imageUrl.startsWith('http')) ? r.image_edit.imageUrl : ''
+            } : null,
+            network: r.network ? Object.fromEntries(
+              Object.entries(r.network).map(([k, v]) => [k, v ? {
+                endpoint: v.endpoint,
+                status: v.status,
+                statusText: v.statusText,
+                latency: v.latency,
+                timedOut: v.timedOut,
+                timeoutLabel: v.timeoutLabel,
+                networkError: v.networkError
+              } : null])
+            ) : null
+          }));
+        };
+
+        const safeWriteLocalStorage = (key, rawList, sanitizer) => {
+          let items = sanitizer(rawList);
+          while (items.length > 0) {
+            try {
+              localStorage.setItem(key, JSON.stringify(items));
+              return true;
+            } catch (err) {
+              if (items.length <= 1) {
+                console.warn(`LocalStorage 配额不足，无法写入 ${key}:`, err);
+                break;
+              }
+              items = items.slice(0, Math.floor(items.length / 2));
+            }
+          }
+          return false;
+        };
 
         const saveChatResultsToStorage = () => {
-
-          try {
-
-            const data = JSON.stringify(testResults.value || []);
-
-            localStorage.setItem(STORAGE_KEY_CHAT_RESULTS, data);
-
-          } catch (err) {
-
-            console.warn('LocalStorage error saving chat results:', err);
-
-            try {
-
-              // 降级：若存储配额超限，移除 raw 流式报文并保留最近 50 条
-
-              const sanitized = (testResults.value || []).slice(0, 50).map(r => {
-
-                const copy = { ...r };
-
-                if (copy.raw) copy.raw = {};
-
-                return copy;
-
-              });
-
-              localStorage.setItem(STORAGE_KEY_CHAT_RESULTS, JSON.stringify(sanitized));
-
-            } catch (e) {
-
-              console.error('LocalStorage quota exceeded for chat results', e);
-
-            }
-
-          }
-
+          const list = testResults.value || [];
+          idbSet('chat_results', list);
+          safeWriteLocalStorage(STORAGE_KEY_CHAT_RESULTS, list, sanitizeChatForLocalStorage);
         };
-
-
 
         const saveImageResultsToStorage = () => {
-
-          try {
-
-            const data = JSON.stringify(imageTestResults.value || []);
-
-            localStorage.setItem(STORAGE_KEY_IMAGE_RESULTS, data);
-
-          } catch (err) {
-
-            console.warn('LocalStorage error saving image results:', err);
-
-            try {
-
-              // 降级：若生图返回了超大 base64，剥离持久化中的大 Base64 数据以防配额溢出
-
-              const sanitized = (imageTestResults.value || []).slice(0, 40).map(r => {
-
-                const item = JSON.parse(JSON.stringify(r));
-
-                ['image_gen', 'image_edit'].forEach(k => {
-
-                  if (item[k]?.imageUrl && item[k].imageUrl.startsWith('data:') && item[k].imageUrl.length > 50000) {
-
-                    item[k].imageUrl = '';
-
-                  }
-
-                });
-
-                return item;
-
-              });
-
-              localStorage.setItem(STORAGE_KEY_IMAGE_RESULTS, JSON.stringify(sanitized));
-
-            } catch (e) {
-
-              console.error('LocalStorage quota exceeded for image results', e);
-
-            }
-
-          }
-
+          const list = imageTestResults.value || [];
+          idbSet('image_results', list);
+          safeWriteLocalStorage(STORAGE_KEY_IMAGE_RESULTS, list, sanitizeImageForLocalStorage);
         };
 
-
+        if (typeof window !== 'undefined') {
+          window.addEventListener('beforeunload', () => {
+            if (testResults.value && testResults.value.length > 0) {
+              saveChatResultsToStorage();
+            }
+            if (imageTestResults.value && imageTestResults.value.length > 0) {
+              saveImageResultsToStorage();
+            }
+          });
+        }
 
         const testResults = ref([]);
 
@@ -13819,29 +13966,19 @@
 
 
         const clearResults = () => {
-
           const modeName = testMode.value === 'image' ? '图片生成与编辑' : '对话';
-
           if (confirm(`确定清空当前【${modeName}】的所有已检测结果吗？`)) {
-
             if (testMode.value === 'image') {
-
               imageTestResults.value = [];
-
               localStorage.removeItem(STORAGE_KEY_IMAGE_RESULTS);
-
+              idbDelete('image_results');
             } else {
-
               testResults.value = [];
-
               localStorage.removeItem(STORAGE_KEY_CHAT_RESULTS);
-
+              idbDelete('chat_results');
             }
-
             showToast(`已清空${modeName}检测记录`);
-
           }
-
         };
 
 
@@ -14984,59 +15121,71 @@
 
           testImageDataUrl.value = generateTestCanvasImage();
 
-
-
-          // 读取本地存储的历史检测结果 (对话与图片生成/编辑独立隔离存储)
-
+          // 1. 同步瞬间加载 LocalStorage 缓存，保证页面进入/刷新瞬间列表立即可见，零等待、零白屏
           try {
-
             const savedChat = localStorage.getItem(STORAGE_KEY_CHAT_RESULTS);
-
             if (savedChat) {
-
               const parsed = JSON.parse(savedChat);
-
               if (Array.isArray(parsed) && parsed.length > 0) {
-
                 testResults.value = parsed;
-
               }
-
             }
-
           } catch (e) {
-
-            console.warn('读取历史对话检测结果失败:', e);
-
+            console.warn('读取 LocalStorage 历史对话结果失败:', e);
           }
-
-
 
           try {
-
             const savedImage = localStorage.getItem(STORAGE_KEY_IMAGE_RESULTS);
-
             if (savedImage) {
-
               const parsed = JSON.parse(savedImage);
-
               if (Array.isArray(parsed) && parsed.length > 0) {
-
                 imageTestResults.value = parsed;
-
               }
-
             }
-
           } catch (e) {
-
-            console.warn('读取历史图片检测结果失败:', e);
-
+            console.warn('读取 LocalStorage 历史图片结果失败:', e);
           }
 
+          // 2. 异步自 IndexedDB 深度水合（Hydration）：恢复完整报文抓包、完整流数据与原图 Base64
+          idbGet('chat_results').then((idbChat) => {
+            if (Array.isArray(idbChat) && idbChat.length > 0) {
+              if (!testResults.value || testResults.value.length === 0) {
+                testResults.value = idbChat;
+              } else {
+                const idbMap = new Map();
+                idbChat.forEach(item => idbMap.set(item.model, item));
+                testResults.value = testResults.value.map(localItem => {
+                  const fullItem = idbMap.get(localItem.model);
+                  return fullItem ? { ...localItem, ...fullItem } : localItem;
+                });
+                idbChat.forEach(item => {
+                  if (!testResults.value.some(r => r.model === item.model)) {
+                    testResults.value.push(item);
+                  }
+                });
+              }
+            }
+          }).catch(() => {});
 
-
-          // 读取本地存储配置
+          idbGet('image_results').then((idbImg) => {
+            if (Array.isArray(idbImg) && idbImg.length > 0) {
+              if (!imageTestResults.value || imageTestResults.value.length === 0) {
+                imageTestResults.value = idbImg;
+              } else {
+                const idbMap = new Map();
+                idbImg.forEach(item => idbMap.set(item.model, item));
+                imageTestResults.value = imageTestResults.value.map(localItem => {
+                  const fullItem = idbMap.get(localItem.model);
+                  return fullItem ? { ...localItem, ...fullItem } : localItem;
+                });
+                idbImg.forEach(item => {
+                  if (!imageTestResults.value.some(r => r.model === item.model)) {
+                    imageTestResults.value.push(item);
+                  }
+                });
+              }
+            }
+          }).catch(() => {});
 
           const savedTheme = localStorage.getItem('model_inspector_theme');
 
