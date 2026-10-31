@@ -3092,6 +3092,12 @@
 
                         </button>
 
+                        <button @click="deleteSingleResult(res.model)"
+                                class="p-1.5 text-xs rounded-lg border transition flex-shrink-0 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 border-transparent hover:border-rose-500/30"
+                                title="删除此模型的检测记录">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+
                       </div>
 
                     </td>
@@ -3480,6 +3486,12 @@
 
                         </button>
 
+                        <button @click="deleteSingleResult(res.model)"
+                                class="p-1.5 text-xs rounded-lg border transition flex-shrink-0 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 border-transparent hover:border-rose-500/30"
+                                title="删除此模型的检测记录">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+
                       </div>
 
                     </td>
@@ -3842,6 +3854,10 @@
 
                   </button>
 
+                  <button @click="deleteSingleResult(res.model)" class="text-xs text-slate-400 hover:text-rose-400 hover:underline">
+                    删除
+                  </button>
+
                 </div>
 
               </div>
@@ -4103,6 +4119,10 @@
                   重新检测
 
                 </button>
+
+                  <button @click="deleteSingleResult(res.model)" class="text-xs text-slate-400 hover:text-rose-400 hover:underline">
+                    删除
+                  </button>
 
               </div>
 
