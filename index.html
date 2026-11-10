@@ -38,7 +38,7 @@
 
   <script src="js/default_example_image.js"></script>
 
-  <script src="js/lm_detector_data.js?v=20261027_050250"></script>
+  <script src="js/lm_detector_data.js?v=20261109_193155"></script>
 
   <script src="js/lm_detector.js"></script>
 
@@ -8454,7 +8454,15 @@
 
         const resetChatPrompt = () => {
 
-          chatPrompt.value = defaultChatPrompt;
+          const regenerated = (window.LMDetector && typeof window.LMDetector.generatePrompt === 'function')
+
+            ? window.LMDetector.generatePrompt('zh', 300)
+
+            : defaultChatPrompt;
+
+          chatPrompt.value = regenerated;
+
+          localStorage.removeItem('model_inspector_chat_prompt');
 
         };
 
@@ -14053,6 +14061,24 @@
 
 
 
+        const referenceModelCountText = (() => {
+
+          try {
+
+            const models = window.LMDetector && typeof window.LMDetector.getModels === 'function' ? window.LMDetector.getModels() : [];
+
+            return models.length ? String(models.length) : '若干';
+
+          } catch (e) {
+
+            return '若干';
+
+          }
+
+        })();
+
+
+
         const loadDemoResults = () => {
 
           if (testMode.value === 'image') {
@@ -14491,7 +14517,7 @@
 
                   },
 
-                  evidence: '根据 298 个整数提取特征分布并与参考库 62 种主流模型比对，最可能为 gpt-4o (相对置信度 96.8%)。'
+                  evidence: `根据 298 个整数提取特征分布并与参考库 ${referenceModelCountText} 种主流模型比对，最可能为 gpt-4o (相对置信度 96.8%)。`
 
                 }
 
@@ -14727,7 +14753,7 @@
 
                   },
 
-                  evidence: '根据 300 个整数提取特征分布并与参考库 62 种主流模型比对，最可能为 deepseek-r1 (相对置信度 96.5%)。'
+                  evidence: `根据 300 个整数提取特征分布并与参考库 ${referenceModelCountText} 种主流模型比对，最可能为 deepseek-r1 (相对置信度 96.5%)。`
 
                 }
 
@@ -14903,7 +14929,7 @@
 
                   },
 
-                  evidence: '根据 300 个整数提取特征分布并与参考库 62 种主流模型比对，最可能为 claude-sonnet-4.6 (相对置信度 98.2%)。'
+                  evidence: `根据 300 个整数提取特征分布并与参考库 ${referenceModelCountText} 种主流模型比对，最可能为 claude-sonnet-4.6 (相对置信度 98.2%)。`
 
                 }
 
@@ -15037,7 +15063,7 @@
 
         watch(checkChat, (v) => localStorage.setItem('model_inspector_check_chat', v ? '1' : '0'));
 
-        watch(chatPrompt, (v) => localStorage.setItem('model_inspector_chat_prompt', v));
+        watch(chatPrompt, (v) => localStorage.setItem('model_inspector_chat_prompt', v), { flush: 'sync' });
 
         watch(checkThinking, (v) => localStorage.setItem('model_inspector_check_thinking', v ? '1' : '0'));
 

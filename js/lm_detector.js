@@ -11,7 +11,7 @@
   const DIMENSION = VALUE_MAX - VALUE_MIN + 1; // 355
   const ALPHA = 0.5;
   const POSITIONAL_WEIGHTS = [0.6, 0.15, 0.125, 0.125];
-  const CENTRES = Array.from({ length: 24 }, (_, i) => 1 + i * 354 / 23);
+  const CENTRES = Array.from({ length: 24 }, (_, i) => VALUE_MIN + i * (DIMENSION - 1) / 23);
   const LAGS = [1, 2, 3, 5, 8, 13, 21, 34];
   const SEQUENCE_LIMITS = { autocorrelation: -0.23, small_step_share: 0.05 };
 
@@ -97,7 +97,7 @@
     for (const chunk of splitIntoFour(numbers)) {
       const bins = Array(16).fill(0.5);
       for (const value of chunk) {
-        const index = Math.min(15, Math.floor(((value - 1) / 355) * 16));
+        const index = Math.min(15, Math.floor(((value - VALUE_MIN) / DIMENSION) * 16));
         bins[index] += 1;
       }
       const total = bins.reduce((sum, value) => sum + value, 0);
@@ -146,14 +146,14 @@
       const count = n - lag, d = Array.from({ length: count }, (_, i) => x[i + lag] - x[i]);
       out.push(
         mean(d.map((_, i) => s[i + lag] * s[i])),
-        mean(d.map(Math.abs)) / 355,
+        mean(d.map(Math.abs)) / DIMENSION,
         fraction(count, i => d[i] > 0),
         fraction(count, i => d[i] === 0),
         fraction(count, i => Math.abs(d[i]) <= 5),
         fraction(count, i => Math.abs(d[i]) <= 20)
       );
     }
-    out.push(...centredTransitions(x.map(v => Math.min(7, Math.floor((v - 1) * 8 / 355))), 8));
+    out.push(...centredTransitions(x.map(v => Math.min(7, Math.floor((v - VALUE_MIN) * 8 / DIMENSION))), 8));
     out.push(...centredTransitions(x.map(v => v % 10), 10));
     const difference = Array.from({ length: n - 1 }, (_, i) => x[i + 1] - x[i]);
     const zStep = Array.from({ length: n - 1 }, (_, i) => Math.abs(s[i + 1] - s[i]));
@@ -164,7 +164,7 @@
       fraction(n - 1, i => zStep[i] > 1),
       fraction(n - 1, i => zStep[i] > 2)
     );
-    const buckets = x.map(v => Math.min(15, Math.floor((v - 1) * 16 / 355)));
+    const buckets = x.map(v => Math.min(15, Math.floor((v - VALUE_MIN) * 16 / DIMENSION)));
     for (const width of [4, 8, 16]) {
       let sum = 0;
       for (let i = 0; i + width <= n; i++) sum += new Set(buckets.slice(i, i + width)).size / width;
@@ -341,7 +341,7 @@
       template = values.find(t => t.id === lang) || values[0];
     }
     if (!template) {
-      return `这是一次独立的数值选择记录。为各个位置分别凭第一反应选择 ${count} 个 1 到 355（含端点）的整数。每个位置都要单独选择；不要从 1 开始计数，不要连续递增或递减，也不要采用等差、循环、重复区块或其他规则化模式。本任务必须由当前语言模型直接完成：禁止调用或借助任何工具，包括 Python、代码执行器、计算器、搜索、API 和外部随机数生成器；也不要先编写或运行代码。允许某个数字再次出现；每项写出后不要回头排序、去重或替换。数字之间用逗号或空格分隔均可。直接从第一个取值开始输出，不要在序列前重复数量、范围或任务说明。`;
+      return `这是一次独立的数值选择记录。为各个位置分别凭第一反应选择 ${count} 个 ${VALUE_MIN} 到 ${VALUE_MAX}（含端点）的整数。每个位置都要单独选择；不要从 1 开始计数，不要连续递增或递减，也不要采用等差、循环、重复区块或其他规则化模式。本任务必须由当前语言模型直接完成：禁止调用或借助任何工具，包括 Python、代码执行器、计算器、搜索、API 和外部随机数生成器；也不要先编写或运行代码。允许某个数字再次出现；每项写出后不要回头排序、去重或替换。数字之间用逗号或空格分隔均可。直接从第一个取值开始输出，不要在序列前重复数量、范围或任务说明。`;
     }
 
     const pick = (arr) => (arr && arr.length ? arr[Math.floor(Math.random() * arr.length)] : '');
@@ -356,9 +356,9 @@
         .replace('${action}', action)
         .replace('${count}', count);
     } else if (lang === 'zh') {
-      req = `${action} ${count} 个 1 到 355（含端点）的整数。`;
+      req = `${action} ${count} 个 ${VALUE_MIN} 到 ${VALUE_MAX}（含端点）的整数。`;
     } else {
-      req = `${action} ${count} integers from 1 to 355, inclusive.`;
+      req = `${action} ${count} integers from ${VALUE_MIN} to ${VALUE_MAX}, inclusive.`;
     }
 
     const parts = [
@@ -383,7 +383,7 @@
     if (numbers.length < minNumbers) {
       return {
         success: false,
-        error: `有效整数不足 (仅提取到 ${numbers.length} 个 1-355 之间的整数，至少需 ${minNumbers} 个)`,
+        error: `有效整数不足 (仅提取到 ${numbers.length} 个 ${VALUE_MIN}-${VALUE_MAX} 之间的整数，至少需 ${minNumbers} 个)`,
         numbersCount: numbers.length,
         expectedCount,
         prediction: '',
@@ -400,7 +400,7 @@
     const bank = getBank();
     const outputs = [{ text, expected_count: expectedCount }];
 
-    const rawOutOfRangeCount = Array.from(String(text).matchAll(/-?\d+/g), m => Number(m[0])).filter(n => n < 1 || n > 355).length;
+    const rawOutOfRangeCount = Array.from(String(text).matchAll(/-?\d+/g), m => Number(m[0])).filter(n => n < VALUE_MIN || n > VALUE_MAX).length;
     const seq = sequenceShape([numbers]);
 
     if (!seq.model_like) {
@@ -469,7 +469,7 @@
         sequence: seq,
         rawOutOfRangeCount
       },
-      evidence: `根据 ${numbers.length} 个整数提取特征分布并与参考库 62 种主流模型比对，最可能为 ${top.displayName} (相对置信度 ${top.percent})。`
+      evidence: `根据 ${numbers.length} 个整数提取特征分布并与参考库 ${detector.model_ids.length} 种主流模型比对，最可能为 ${top.displayName} (相对置信度 ${top.percent})。`
     };
   }
 
