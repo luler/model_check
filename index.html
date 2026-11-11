@@ -38,9 +38,9 @@
 
   <script src="js/default_example_image.js"></script>
 
-  <script src="js/lm_detector_data.js?v=20261109_193155"></script>
+  <script src="js/lm_detector_data.js?v=20261111_012458"></script>
 
-  <script src="js/lm_detector.js"></script>
+  <script src="js/lm_detector.js?v=20261111_174500"></script>
 
 
 
@@ -4414,7 +4414,7 @@
 
                   :class="activeInspectorResult.chat?.supported ? 'bg-cyan-500/20 text-cyan-300' : 'bg-rose-500/20 text-rose-300'">
 
-              {{ activeInspectorResult.chat?.supported ? '✓ 可用' : '✕ 失败' }}
+              {{ activeInspectorResult.chat?.supported ? (activeInspectorResult.chat?.fingerprint?.predictionName ? ('✓ ' + activeInspectorResult.chat.fingerprint.predictionName) : '✓ 可用') : '✕ 失败' }}
 
             </span>
 
@@ -6012,7 +6012,7 @@
 
                   <p class="text-[11px] opacity-80 mt-0.5">
 
-                    响应耗时: {{ formatDuration(activeInspectorResult.chat.latency) }} · 判定结论: {{ activeInspectorResult.chat.supported ? '成功返回预期文本 PONG' : (activeInspectorResult.chat.error || '连通失败') }}
+                    响应耗时: {{ formatDuration(activeInspectorResult.chat.latency) }} · 判定结论: {{ activeInspectorResult.chat.detail || (activeInspectorResult.chat.supported ? (activeInspectorResult.chat.fingerprint?.predictionName ? ('指纹: ' + activeInspectorResult.chat.fingerprint.predictionName + ' (' + activeInspectorResult.chat.fingerprint.percent + ')') : '基础对话连通正常') : (activeInspectorResult.chat.error || '连通失败')) }}
 
                   </p>
 
@@ -6087,6 +6087,10 @@
                   <span>有效整数: {{ activeInspectorResult.chat.fingerprint.numbersCount }} / {{ activeInspectorResult.chat.fingerprint.expectedCount }}</span>
 
                   <span v-if="activeInspectorResult.chat.fingerprint.success">· 置信度: <strong class="text-emerald-400">{{ activeInspectorResult.chat.fingerprint.percent }}</strong></span>
+
+                  <button @click="recalculateActiveFingerprint()" title="重新提取整数特征并计算指纹" class="ml-2 px-2 py-0.5 rounded text-[11px] font-sans text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 border border-cyan-500/30 transition flex items-center space-x-1">
+                    <span>🔄 重新计算</span>
+                  </button>
 
                 </div>
 
@@ -6328,6 +6332,26 @@
 
               </details>
 
+            </div>
+
+            <!-- Fallback Fingerprint Card when fingerprint has not been calculated yet -->
+            <div v-else-if="activeInspectorResult.chat?.supported" class="p-4 rounded-xl border flex flex-wrap items-center justify-between gap-3 transition-colors"
+                 :class="isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'">
+              <div class="flex items-center space-x-3">
+                <span class="text-2xl">🎯</span>
+                <div>
+                  <h5 class="text-sm font-bold" :class="isDarkMode ? 'text-slate-200' : 'text-slate-800'">
+                    模型指纹分析 (LM Fingerprint Detector)
+                  </h5>
+                  <p class="text-xs text-slate-400 mt-0.5">
+                    {{ activeInspectorResult.chat?.detail || '尚未生成模型指纹分析数据。点击右侧按钮可直接基于当前服务端响应报文重新提取并计算指纹。' }}
+                  </p>
+                </div>
+              </div>
+              <button @click="recalculateActiveFingerprint()"
+                      class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white shadow-sm flex items-center space-x-1.5 transition active:scale-95">
+                <span>🎯 立即识别模型指纹</span>
+              </button>
             </div>
 
 
@@ -8466,6 +8490,194 @@
 
         };
 
+        const ensureLMDetectorReady = async (timeoutMs = 3500) => {
+
+          if (window.LMDetector && typeof window.LMDetector.isReady === 'function' && window.LMDetector.isReady()) return true;
+
+          const start = Date.now();
+
+          while (Date.now() - start < timeoutMs) {
+
+            await new Promise(r => setTimeout(r, 100));
+
+            if (window.LMDetector && typeof window.LMDetector.isReady === 'function' && window.LMDetector.isReady()) return true;
+
+          }
+
+          return false;
+
+        };
+
+        const computeFingerprintForResult = (res) => {
+
+          if (!res) return null;
+
+          if (!res.chat) {
+
+            res.chat = { supported: false, latency: 0, replyText: '', reasoning: '', error: null, usage: null, fingerprint: null, detail: '' };
+
+          }
+
+          if (res.chat.fingerprint && res.chat.fingerprint.predictionName) {
+
+            return res.chat.fingerprint;
+
+          }
+
+          let text = (res.chat.replyText || '').trim();
+
+          if (!text) {
+
+            const rawContent = res.network?.chat?.responseBody?.choices?.[0]?.message?.content
+
+              || res.raw?.chatResponse?.choices?.[0]?.message?.content
+
+              || '';
+
+            if (typeof rawContent === 'string' && rawContent.trim()) {
+
+              text = rawContent.trim();
+
+              res.chat.replyText = text;
+
+            }
+
+          }
+
+          if (!text) return null;
+
+          if (window.LMDetector && typeof window.LMDetector.analyze === 'function' && window.LMDetector.isReady()) {
+
+            try {
+
+              const fp = window.LMDetector.analyze(text, { expectedCount: 300 });
+
+              if (fp) {
+
+                res.chat.fingerprint = fp;
+
+                if (fp.success && fp.predictionName) {
+
+                  res.chat.detail = `指纹: ${fp.predictionName} (${fp.percent})`;
+
+                } else if (!fp.success) {
+
+                  res.chat.detail = `对话正常 (指纹未充分识别: ${fp.error || '有效整数较少'})`;
+
+                }
+
+                return fp;
+
+              }
+
+            } catch (e) {
+
+              console.warn('动态计算指纹异常:', e);
+
+            }
+
+          }
+
+          return res.chat.fingerprint || null;
+
+        };
+
+        const recalculateActiveFingerprint = () => {
+
+          if (!activeInspectorResult.value) return;
+
+          const res = activeInspectorResult.value;
+
+          if (!res.chat) {
+
+            res.chat = { supported: false, latency: 0, replyText: '', reasoning: '', error: null, usage: null, fingerprint: null, detail: '' };
+
+          }
+
+          let text = (res.chat.replyText || '').trim();
+
+          if (!text) {
+
+            const rawContent = res.network?.chat?.responseBody?.choices?.[0]?.message?.content
+
+              || res.raw?.chatResponse?.choices?.[0]?.message?.content
+
+              || '';
+
+            if (typeof rawContent === 'string' && rawContent.trim()) {
+
+              text = rawContent.trim();
+
+              res.chat.replyText = text;
+
+            }
+
+          }
+
+          if (!text) {
+
+            showToast('响应报文中未提取到有效文本，无法计算指纹');
+
+            return;
+
+          }
+
+          if (!window.LMDetector || typeof window.LMDetector.analyze !== 'function' || !window.LMDetector.isReady()) {
+
+            showToast('指纹库 (LMDetector) 尚未准备就绪，请稍后重试');
+
+            return;
+
+          }
+
+          try {
+
+            const fp = window.LMDetector.analyze(text, { expectedCount: 300 });
+
+            res.chat.fingerprint = fp;
+
+            if (fp && fp.success && fp.predictionName) {
+
+              res.chat.detail = `指纹: ${fp.predictionName} (${fp.percent})`;
+
+              showToast(`🎯 指纹识别成功: ${fp.predictionName} (${fp.percent})`);
+
+            } else if (fp && !fp.success) {
+
+              res.chat.detail = `对话正常 (指纹未充分识别: ${fp.error || '有效整数较少'})`;
+
+              showToast(`指纹未充分识别: ${fp.error || '有效整数较少'}`);
+
+            }
+
+            saveChatResultsToStorage();
+
+          } catch (e) {
+
+            console.error('重新计算指纹异常:', e);
+
+            showToast('指纹分析异常: ' + (e.message || e));
+
+          }
+
+        };
+
+        const scanAndHydrateFingerprints = () => {
+
+          if (!window.LMDetector || typeof window.LMDetector.isReady !== 'function' || !window.LMDetector.isReady()) return;
+
+          (testResults.value || []).forEach(r => {
+
+            if (r.chat && r.chat.supported && (!r.chat.fingerprint || !r.chat.fingerprint.predictionName)) {
+
+              computeFingerprintForResult(r);
+
+            }
+
+          });
+
+        };
+
         const pelicanPrompt = ref('生成一个svg动画：鹈鹕骑自行车，用H5给我展示下');
 
         const thinkingPrompt = ref('strawberry 这个单词里有几个字母 r？请先输出你的详细推理思考过程，再给出最终答案数字。');
@@ -8732,14 +8944,19 @@
               usage: r.chat.usage,
               fingerprint: r.chat.fingerprint ? {
                 success: r.chat.fingerprint.success,
-                prediction: r.chat.fingerprint.prediction,
-                predictionName: r.chat.fingerprint.predictionName,
-                family: r.chat.fingerprint.family,
-                familyName: r.chat.fingerprint.familyName,
-                percent: r.chat.fingerprint.percent,
-                probability: r.chat.fingerprint.probability,
-                score: r.chat.fingerprint.score,
-                ranking: (r.chat.fingerprint.ranking || []).slice(0, 5)
+                error: r.chat.fingerprint.error || null,
+                numbersCount: r.chat.fingerprint.numbersCount || 0,
+                expectedCount: r.chat.fingerprint.expectedCount || 300,
+                prediction: r.chat.fingerprint.prediction || '',
+                predictionName: r.chat.fingerprint.predictionName || '',
+                family: r.chat.fingerprint.family || '',
+                familyName: r.chat.fingerprint.familyName || '',
+                percent: r.chat.fingerprint.percent || '',
+                probability: r.chat.fingerprint.probability || null,
+                score: r.chat.fingerprint.score || 0,
+                evidence: r.chat.fingerprint.evidence || '',
+                diagnostics: r.chat.fingerprint.diagnostics || null,
+                ranking: (r.chat.fingerprint.ranking || []).slice(0, 10)
               } : null
             } : null,
             thinking: r.thinking ? {
@@ -11637,7 +11854,9 @@
 
                 try {
 
-                  if (window.LMDetector && window.LMDetector.isReady()) {
+                  const isDetectorReady = await ensureLMDetectorReady(3000);
+
+                  if (isDetectorReady && window.LMDetector && window.LMDetector.isReady()) {
 
                     const fp = window.LMDetector.analyze(reply, { expectedCount: 300 });
 
@@ -11659,7 +11878,7 @@
 
                   } else {
 
-                    result.chat.detail = '对话连通正常 (指纹库未加载)';
+                    result.chat.detail = '对话连通正常 (指纹库正在加载或未就绪)';
 
                   }
 
@@ -11667,7 +11886,7 @@
 
                   console.warn('指纹分析异常:', e);
 
-                  result.chat.detail = '对话连通正常';
+                  result.chat.detail = `对话连通正常 (指纹分析异常: ${e.message || e})`;
 
                 }
 
@@ -13773,7 +13992,9 @@
 
               detail: '',
 
-              error: null
+              error: null,
+
+              ...(dimKey === 'chat' ? { replyText: '', reasoning: '', usage: null, fingerprint: null } : {})
 
             };
 
@@ -13949,7 +14170,23 @@
 
           showRawStream.value = false; // 打开弹窗默认展示合并后的完整 JSON
 
+          if (res.chat) {
+
+            computeFingerprintForResult(res);
+
+          }
+
         };
+
+        watch(inspectorTab, (newTab) => {
+
+          if (newTab === 'chat' && activeInspectorResult.value) {
+
+            computeFingerprintForResult(activeInspectorResult.value);
+
+          }
+
+        });
 
 
 
@@ -15170,8 +15407,15 @@
                   }
                 });
               }
+              scanAndHydrateFingerprints();
             }
           }).catch(() => {});
+
+          ensureLMDetectorReady(5000).then((ready) => {
+            if (ready) {
+              scanAndHydrateFingerprints();
+            }
+          });
 
           idbGet('image_results').then((idbImg) => {
             if (Array.isArray(idbImg) && idbImg.length > 0) {
@@ -15626,6 +15870,10 @@
           randomizeChatPrompt,
 
           resetChatPrompt,
+
+          recalculateActiveFingerprint,
+
+          computeFingerprintForResult,
 
           checkThinking,
 
